@@ -7,12 +7,21 @@ const nodemailer = require('nodemailer');
 const multer = require('multer');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 const dbPath = path.join(__dirname, 'artist-dashboard.db');
 const uploadDir = path.join(__dirname, 'uploads');
 const authCookieName = 'artist_session';
 
 fs.mkdirSync(uploadDir, { recursive: true });
+
+app.use((req, res, next) => {
+  const trackingKeys = Object.keys(req.query).filter((key) => key.toLowerCase().startsWith('utm_'));
+  if (trackingKeys.length === 0) return next();
+
+  const cleanUrl = new URL(`${req.protocol}://${req.get('host')}${req.originalUrl}`);
+  trackingKeys.forEach((key) => cleanUrl.searchParams.delete(key));
+  return res.redirect(302, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+});
 
 const mediaUpload = multer({
   storage: multer.diskStorage({
@@ -736,7 +745,7 @@ app.get('*', (req, res) => {
 
 if (require.main === module) {
   dbReady.then(() => {
-    app.listen(port, () => {
+    app.listen(port, '0.0.0.0', () => {
       console.log(`Artist dashboard API running on http://localhost:${port}`);
     });
   }).catch((error) => {
