@@ -1,0 +1,24 @@
+{
+  "name": "artist-epk-dashboard",
+  "version": "1.0.0",
+  "description": "Backend API for the artist EPK dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "music",
+    "dashboard",
+    "epk",
+    "express"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^2.4.0",
+    "nodemailer": "^6.9.14",
+    "sqlite3": "^5.1.7"
+  }
+}

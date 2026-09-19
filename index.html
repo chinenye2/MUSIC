@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Artist dashboard overview for managing an Electronic Press Kit."
+    />
+    <title>Artist Hub Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="dashboard-body">
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-block">
+          <div class="logo">Mq</div>
+          <div>
+            <strong>Marisquti</strong>
+            <small>EPK Dashboard</small>
+          </div>
+        </div>
+            <strong data-profile="artistName">Marisquti</strong>
+        <nav class="sidebar-nav" aria-label="Dashboard navigation">
+          <button class="nav-item active" data-target="profilePanel" type="button"><span>👤</span> Artist profile management</button>
+          <button class="nav-item" data-target="musicPanel" type="button"><span>🎵</span> Music management</button>
+          <button class="nav-item" data-target="mediaPanel" type="button"><span>📸</span> Media gallery</button>
+          <button class="nav-item" data-target="eventsPanel" type="button"><span>📅</span> Events</button>
+          <button class="nav-item" data-target="pressPanel" type="button"><span>📰</span> Press & achievements</button>
+          <button class="nav-item" data-target="messagesPanel" type="button"><span>💬</span> Booking messages</button>
+          <button class="nav-item" type="button"><span>⚙️</span> Settings</button>
+        </nav>
+      </aside>
+
+      <div class="page-shell">
+        <header class="header">
+          <div class="header-left">
+            <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle menu">☰</button>
+            <div>
+              <p class="eyebrow">Dashboard overview</p>
+                  <h1>Welcome back, <span data-profile="artistName">Marisquti</span></h1>
+            </div>
+          </div>
+          <button id="publishButton" class="button primary" type="button">Publish EPK</button>
+        </header>
+
+        <div class="logout-row">
+          <a class="button secondary" href="/">View public EPK</a>
+        </div>
+
+        <main class="content">
+          <section class="overview-grid" aria-label="Overview stats">
+            <article class="stat-card accent">
+              <span>Profile completion</span>
+              <strong data-stat="profileCompletion">88%</strong>
+              <small data-profile-updated>Updated recently</small>
+            </article>
+            <article class="stat-card">
+              <span>Tracks live</span>
+              <strong data-stat="tracksLive">12</strong>
+              <small>3 new releases</small>
+            </article>
+            <article class="stat-card">
+              <span>Upcoming events</span>
+              <strong data-stat="upcomingEvents">06</strong>
+              <small>2 festival bookings</small>
+            </article>
+            <article class="stat-card">
+              <span>Booking requests</span>
+              <strong data-stat="bookingRequests">14</strong>
+              <small>8 unread messages</small>
+            </article>
+          </section>
+
+          <section class="two-col">
+            <article id="profilePanel" class="panel">
+              <div class="panel-head">
+                <h2>Artist profile</h2>
+                <button class="link-btn" data-action="edit-profile" type="button">Edit</button>
+              </div>
+              <ul class="profile-list">
+                <li><span>Stage name</span><strong data-profile="stageName">Aster Vale</strong></li>
+                <li><span>Genre</span><strong data-profile="genre">Alt-pop / Electronic</strong></li>
+                <li><span>Location</span><strong data-profile="location">Lagos, Lag</strong></li>
+                <li><span>Bio status</span><strong data-profile="bioStatus">Approved</strong></li>
+              </ul>
+            </article>
+
+            <article id="eventsPanel" class="panel">
+              <div class="panel-head">
+                <h2>Upcoming events</h2>
+                <button class="link-btn" data-target="eventsPanel" type="button">View all</button>
+              </div>
+              <button class="link-btn" data-action="add-event" type="button">Add event</button>
+              <div id="eventList" class="event-list"></div>
+            </article>
+          </section>
+
+          <section class="details-grid">
+            <article id="musicPanel" class="panel">
+              <div class="panel-head">
+                <h2>Music management</h2>
+                <button class="link-btn" data-action="add-track" type="button">Add track</button>
+              </div>
+              <div id="musicList" class="table-list">
+                <div class="table-row table-header">
+                  <span>Track</span>
+                  <span>Platform</span>
+                  <span>Status</span>
+                </div>
+              </div>
+            </article>
+
+            <article id="messagesPanel" class="panel">
+              <div class="panel-head">
+                <h2>Booking messages</h2>
+                <button class="link-btn" data-action="add-message" type="button">New message</button>
+              </div>
+              <div id="messageList" class="message-list"></div>
+            </article>
+          </section>
+
+          <section class="details-grid gallery-grid-section">
+            <article id="mediaPanel" class="panel">
+              <div class="panel-head">
+                <h2>Media gallery</h2>
+                <button id="uploadButton" class="link-btn" type="button">Upload</button>
+                <input id="mediaInput" type="file" accept="image/*,video/*" multiple hidden />
+              </div>
+              <p class="media-help">Use MP4 with H.264/AAC or WebM for browser playback.</p>
+              <div id="mediaGrid" class="media-grid">
+                <div class="media-box media-one"></div>
+                <div class="media-box media-two"></div>
+                <div class="media-box media-three"></div>
+                <div class="media-box media-four"></div>
+              </div>
+            </article>
+
+            <article id="pressPanel" class="panel">
+              <div class="panel-head">
+                <h2>Press & achievements</h2>
+                <button class="link-btn" data-action="add-feature" type="button">Add feature</button>
+              </div>
+              <ul id="pressList" class="achievement-list"></ul>
+            </article>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

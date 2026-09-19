@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Aster Vale electronic press kit." />
+    <title>Aster Vale | Electronic Press Kit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root { --ink: #10151c; --paper: #f2efe8; --lime: #d8f86b; --muted: #687078; --line: rgba(16, 21, 28, 0.16); }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: var(--paper); font-family: 'DM Sans', sans-serif; }
+      a { color: inherit; }
+      .hero { min-height: 78vh; padding: 28px clamp(22px, 5vw, 80px) 42px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(135deg, #f2efe8, #d9e5d7 58%, #c9dff0); }
+      .nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+      .brand { display: flex; align-items: center; gap: 12px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+      .mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--lime); }
+      .nav a, .button { text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 0.7rem 1rem; font-weight: 700; }
+      .hero-copy { max-width: 780px; padding: 10vh 0 4vh; }
+      .eyebrow { margin: 0 0 18px; color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+      h1, h2 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.07em; }
+      h1 { max-width: 760px; margin: 0; font-size: clamp(2.8rem, 7vw, 6.2rem); line-height: 0.92; }
+      .hero-copy p { max-width: 470px; margin: 28px 0 0; color: #4c555b; font-size: 1.12rem; }
+      .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+      .button.primary { background: var(--ink); color: var(--paper); }
+      .button.secondary { background: transparent; }
+      .content { padding: 64px clamp(22px, 5vw, 80px); }
+      .section-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+      h2 { margin: 0; font-size: clamp(2rem, 5vw, 4.5rem); }
+      .section-head p { max-width: 300px; margin: 0; color: var(--muted); }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 24px; }
+      .card { min-height: 220px; padding: 22px; border: 1px solid var(--line); border-radius: 18px; display: flex; flex-direction: column; justify-content: end; }
+      .card:nth-child(1) { background: #d8f86b; } .card:nth-child(2) { background: #f6c3a8; } .card:nth-child(3) { background: #b9d9ef; }
+      .card strong { font-family: 'Space Grotesk', sans-serif; font-size: 1.35rem; }
+      .card span { margin-top: 6px; color: #505961; }
+      .gallery { margin-top: 70px; }
+      .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 24px; }
+      .gallery-item { min-height: 240px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #d9e5d7; }
+      .gallery-item img, .gallery-item video { width: 100%; height: 100%; min-height: 240px; display: block; object-fit: cover; }
+      .gallery-actions { display: flex; gap: 8px; padding: 10px; background: rgba(255,255,255,0.58); }
+      .gallery-actions button, .gallery-actions a { border: 1px solid var(--line); border-radius: 999px; padding: 0.45rem 0.7rem; background: transparent; color: var(--ink); font: inherit; font-size: 0.78rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+      .gallery-actions button.liked { background: var(--ink); color: var(--paper); }
+      .gallery-empty { color: var(--muted); }
+      .booking { margin-top: 70px; padding-top: 28px; border-top: 1px solid var(--line); }
+      .booking-form { max-width: 680px; display: grid; gap: 14px; margin-top: 24px; }
+      .booking-form label { display: grid; gap: 6px; color: var(--muted); font-size: 0.85rem; font-weight: 700; }
+      .booking-form input, .booking-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 0.85rem; background: rgba(255,255,255,0.55); color: var(--ink); font: inherit; }
+      .booking-form textarea { min-height: 130px; resize: vertical; }
+      .booking-status { min-height: 1.4em; color: var(--muted); }
+      footer { padding: 24px clamp(22px, 5vw, 80px); border-top: 1px solid var(--line); color: var(--muted); }
+      @media (max-width: 700px) { .hero { min-height: 84vh; } .grid, .gallery-grid { grid-template-columns: 1fr; } .section-head { display: block; } .section-head p { margin-top: 12px; } }
+    </style>
+  </head>
+  <body>
+    <section class="hero">
+      <nav class="nav" aria-label="Main navigation">
+        <div class="brand"><span class="mark">Mq</span><span>Marisquti</span></div>
+        <div class="nav-links"><a href="/contact">Contact</a><a href="/dashboard">Artist dashboard</a></div>
+      </nav>
+      <div class="hero-copy">
+        <p class="eyebrow">THE HIGH LIFE REVOLUTIONARY</p>
+        <p>ROOTS. RHYTHM. REBIRTH.</p>
+        <h1>Where heritage meets the future of African sound.</h1>
+        <p>Maris Quti belongs to the latter.</p>
+        <p>Born Chimaobi Martins Abonyi, the Nigerian artist is developing a sound that sits at the intersection of contemporary Afrosounds, Afro-fusion and the timeless spirit of Highlife. His music carries the energy of modern African pop while remaining connected to culture, language, spirituality and the stories that have shaped generations.</p>
+        <p>For Quti, music is not simply entertainment. It is identity.</p>
+        <div class="hero-actions"><a class="button primary" href="#music">Explore the EPK</a><a class="button secondary" href="https://music.apple.com/us/artist/maris-quti/1816755808" target="_blank" rel="noreferrer">Listen on Apple Music</a><a class="button secondary" href="/contact">Contact / bookings</a></div>
+      </div>
+    </section>
+    <main class="content" id="music">
+      <div class="section-head"><h2>Featured music</h2><p>Recent releases, live energy, and a catalog built for repeat listens.</p></div>
+      <div class="grid"><article class="card"><strong>Run the Lights</strong><span>Single · Spotify</span></article><article class="card"><strong>Midnight Signal</strong><span>Single · Apple Music</span></article><article class="card"><strong>Afterglow</strong><span>Single · YouTube</span></article></div>
+      <section class="gallery" id="gallery">
+        <div class="section-head"><h2>Gallery</h2><p>Recent images and live moments from the artist dashboard.</p></div>
+        <div id="publicGallery" class="gallery-grid"><p class="gallery-empty">No media uploaded yet.</p></div>
+      </section>
+      <section class="booking" id="booking">
+        <div class="section-head"><h2>Book Aster Vale</h2><p>Send a booking request directly to the artist inbox.</p></div>
+        <form id="bookingForm" class="booking-form">
+          <label>Agency or venue<input name="sender" required placeholder="Your organization" /></label>
+          <label>Email<input name="email" type="email" required placeholder="you@example.com" /></label>
+          <label>Message<textarea name="message" required placeholder="Tell us about the date, venue, and opportunity."></textarea></label>
+          <button class="button primary" type="submit">Send booking request</button>
+          <p id="bookingStatus" class="booking-status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+    <footer>© 2026 Marisquti /ROOTS. RHYTHM. REBIRTH. </footer>
+    <script>
+      const publicGallery = document.getElementById('publicGallery');
+      const apiBase = ['5500', '5501'].includes(window.location.port) ? 'http://localhost:3003' : '';
+      const loadPublicGallery = async () => {
+        try {
+          const response = await fetch('/api/media');
+          if (!response.ok) throw new Error('Unable to load gallery');
+          const media = await response.json();
+          if (!media.length) return;
+          publicGallery.innerHTML = media.map((item) => `<article id="gallery-${item.id}" class="gallery-item" data-media-id="${item.id}">${item.mimeType.startsWith('video/')
+            ? `<video src="${item.url}" controls playsinline preload="metadata" aria-label="${item.originalName}"></video>`
+            : `<img src="${item.url}" alt="${item.originalName}" loading="lazy" />`}<div class="gallery-actions"><button class="like-button" type="button">Like <span>${item.likes || 0}</span></button><button class="share-button" type="button">Share link</button><a href="${item.url}" download="${item.originalName}">Download</a></div></article>`).join('');
+          publicGallery.querySelectorAll('.like-button').forEach((button) => button.addEventListener('click', async () => {
+            const item = button.closest('[data-media-id]');
+            const media = await fetch(`${apiBase}/api/media/${item.dataset.mediaId}/like`, { method: 'POST' }).then((response) => response.json());
+            button.querySelector('span').textContent = media.likes;
+            button.classList.add('liked');
+          }));
+          publicGallery.querySelectorAll('.share-button').forEach((button) => button.addEventListener('click', async () => {
+            const item = button.closest('[data-media-id]');
+            const shareUrl = `${window.location.origin}/#gallery-${item.dataset.mediaId}`;
+            try {
+              if (navigator.share) await navigator.share({ title: 'Marisquti media', url: shareUrl });
+              else await navigator.clipboard.writeText(shareUrl);
+              button.textContent = 'Link copied';
+            } catch {}
+          }));
+        } catch {
+          publicGallery.innerHTML = '<p class="gallery-empty">Gallery is temporarily unavailable.</p>';
+        }
+      };
+      loadPublicGallery();
+
+      const bookingForm = document.getElementById('bookingForm');
+      const bookingStatus = document.getElementById('bookingStatus');
+      bookingForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        bookingStatus.textContent = 'Sending request...';
+        const values = Object.fromEntries(new FormData(bookingForm));
+        try {
+          const response = await fetch(`${apiBase}/api/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: `${values.sender} (${values.email})`, message: values.message }) });
+          const text = await response.text();
+          let data = {};
+          if (text.trim()) {
+            try {
+              data = JSON.parse(text);
+            } catch {
+              data = { error: text.slice(0, 160) };
+            }
+          }
+          if (!response.ok) throw new Error(data.error || `Could not send booking request (${response.status}).`);
+          bookingForm.reset();
+          bookingStatus.textContent = 'Booking request sent successfully.';
+        } catch (error) {
+          bookingStatus.textContent = error.message;
+        }
+      });
+    </script>
+  </body>
+</html>
