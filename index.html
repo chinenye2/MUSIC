@@ -20,13 +20,14 @@
     <div class="app-shell">
       <aside class="sidebar" id="sidebar">
         <div class="brand-block">
-          <div class="logo">Mq</div>
+          <div id="sidebarProfilePicture" class="sidebar-profile-picture">
+            <span class="profile-initials">Mq</span>
+          </div>
           <div>
-            <strong>Marisquti</strong>
+            <strong data-profile="artistName">Marisquti</strong>
             <small>EPK Dashboard</small>
           </div>
         </div>
-            <strong data-profile="artistName">Marisquti</strong>
         <nav class="sidebar-nav" aria-label="Dashboard navigation">
           <button class="nav-item active" data-target="profilePanel" type="button"><span>👤</span> Artist profile management</button>
           <button class="nav-item" data-target="musicPanel" type="button"><span>🎵</span> Music management</button>
@@ -34,7 +35,8 @@
           <button class="nav-item" data-target="eventsPanel" type="button"><span>📅</span> Events</button>
           <button class="nav-item" data-target="pressPanel" type="button"><span>📰</span> Press & achievements</button>
           <button class="nav-item" data-target="messagesPanel" type="button"><span>💬</span> Booking messages</button>
-          <button class="nav-item" type="button"><span>⚙️</span> Settings</button>
+          <button class="nav-item" data-action="open-settings" type="button"><span>⚙️</span> Settings</button>
+          <button class="nav-item logout" data-action="logout" type="button"><span>🚪</span> Logout</button>
         </nav>
       </aside>
 
@@ -83,6 +85,28 @@
               <div class="panel-head">
                 <h2>Artist profile</h2>
                 <button class="link-btn" data-action="edit-profile" type="button">Edit</button>
+              </div>
+              <div class="profile-picture-section">
+                <div class="profile-picture-container">
+                  <div id="profilePictureDisplay" class="profile-picture-display">
+                    <span class="profile-placeholder">Mq</span>
+                  </div>
+                  <div class="profile-picture-actions">
+                    <input id="profileImageInput" type="file" accept="image/*" hidden />
+                    <button id="uploadProfilePicture" class="link-btn" type="button">Change profile picture</button>
+                  </div>
+                </div>
+              </div>
+              <div class="logo-section">
+                <div class="logo-container">
+                  <div id="logoDisplay" class="logo-display">
+                    <span class="logo-placeholder">Mq</span>
+                  </div>
+                  <div class="logo-actions">
+                    <input id="logoInput" type="file" accept="image/*" hidden />
+                    <button id="uploadLogo" class="link-btn" type="button">Change logo</button>
+                  </div>
+                </div>
               </div>
               <ul class="profile-list">
                 <li><span>Stage name</span><strong data-profile="stageName">Aster Vale</strong></li>

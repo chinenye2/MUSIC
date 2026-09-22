@@ -14,10 +14,7 @@
       body { margin: 0; color: var(--ink); background: var(--paper); font-family: 'DM Sans', sans-serif; }
       a { color: inherit; }
       .hero { min-height: 78vh; padding: 28px clamp(22px, 5vw, 80px) 42px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(135deg, #f2efe8, #d9e5d7 58%, #c9dff0); }
-      .nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-      .brand { display: flex; align-items: center; gap: 12px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
-      .mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--lime); }
-      .nav a, .button { text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 0.7rem 1rem; font-weight: 700; }
+      .hero-content { flex: 1; }
       .hero-copy { max-width: 780px; padding: 10vh 0 4vh; }
       .eyebrow { margin: 0 0 18px; color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
       h1, h2 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.07em; }
@@ -26,7 +23,21 @@
       .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
       .button.primary { background: var(--ink); color: var(--paper); }
       .button.secondary { background: transparent; }
+      .nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+      .brand { display: flex; align-items: center; gap: 12px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+      .mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--lime); }
+      .nav a, .button { text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 0.7rem 1rem; font-weight: 700; }
+      .eyebrow { margin: 0 0 18px; color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+      h1, h2 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.07em; }
+      h1 { max-width: 760px; margin: 0; font-size: clamp(2.8rem, 7vw, 6.2rem); line-height: 0.92; }
+      .hero-copy p { max-width: 470px; margin: 28px 0 0; color: #4c555b; font-size: 1.12rem; }
+      .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+      .button.primary { background: var(--ink); color: var(--paper); }
+      .button.secondary { background: transparent; }
       .content { padding: 64px clamp(22px, 5vw, 80px); }
+      .section-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+      h2 { margin: 0; font-size: clamp(2rem, 5vw, 4.5rem); }
+      .section-head p { max-width: 300px; margin: 0; color: var(--muted); }
       .section-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
       h2 { margin: 0; font-size: clamp(2rem, 5vw, 4.5rem); }
       .section-head p { max-width: 300px; margin: 0; color: var(--muted); }
@@ -49,29 +60,54 @@
       .booking-form input, .booking-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 0.85rem; background: rgba(255,255,255,0.55); color: var(--ink); font: inherit; }
       .booking-form textarea { min-height: 130px; resize: vertical; }
       .booking-status { min-height: 1.4em; color: var(--muted); }
+      .card { min-height: 220px; padding: 22px; border: 1px solid var(--line); border-radius: 18px; display: flex; flex-direction: column; justify-content: end; }
+      .card:nth-child(1) { background: #d8f86b; } .card:nth-child(2) { background: #f6c3a8; } .card:nth-child(3) { background: #b9d9ef; }
+      .card strong { font-family: 'Space Grotesk', sans-serif; font-size: 1.35rem; }
+      .card span { margin-top: 6px; color: #505961; }
+      .gallery { margin-top: 70px; }
+      .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 24px; }
+      .gallery-item { min-height: 240px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #d9e5d7; }
+      .gallery-item img, .gallery-item video { width: 100%; height: 100%; min-height: 240px; display: block; object-fit: cover; }
+      .gallery-actions { display: flex; gap: 8px; padding: 10px; background: rgba(255,255,255,0.58); }
+      .gallery-actions button, .gallery-actions a { border: 1px solid var(--line); border-radius: 999px; padding: 0.45rem 0.7rem; background: transparent; color: var(--ink); font: inherit; font-size: 0.78rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+      .gallery-actions button.liked { background: var(--ink); color: var(--paper); }
+      .gallery-empty { color: var(--muted); }
+      .booking { margin-top: 70px; padding-top: 28px; border-top: 1px solid var(--line); }
+      .booking-form { max-width: 680px; display: grid; gap: 14px; margin-top: 24px; }
+      .booking-form label { display: grid; gap: 6px; color: var(--muted); font-size: 0.85rem; font-weight: 700; }
+      .booking-form input, .booking-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 0.85rem; background: rgba(255,255,255,0.55); color: var(--ink); font: inherit; }
+      .booking-form textarea { min-height: 130px; resize: vertical; }
+      .booking-status { min-height: 1.4em; color: var(--muted); }
+      .music-link { color: var(--ink); text-decoration: none; font-weight: 700; }
+      .music-link:hover { text-decoration: underline; }
       footer { padding: 24px clamp(22px, 5vw, 80px); border-top: 1px solid var(--line); color: var(--muted); }
-      @media (max-width: 700px) { .hero { min-height: 84vh; } .grid, .gallery-grid { grid-template-columns: 1fr; } .section-head { display: block; } .section-head p { margin-top: 12px; } }
+      @media (max-width: 700px) { .hero { min-height: 84vh; } .hero-content { text-align: center; } .hero-copy { padding: 4vh 0; } .grid, .gallery-grid { grid-template-columns: 1fr; } .section-head { display: block; } .section-head p { margin-top: 12px; } }
     </style>
   </head>
   <body>
     <section class="hero">
       <nav class="nav" aria-label="Main navigation">
-        <div class="brand"><span class="mark">Mq</span><span>Marisquti</span></div>
+        <div class="brand"><span id="navLogo" class="mark">Mq</span><span>Maris Quti</span></div>
         <div class="nav-links"><a href="/contact">Contact</a><a href="/dashboard">Artist dashboard</a></div>
       </nav>
-      <div class="hero-copy">
-        <p class="eyebrow">THE HIGH LIFE REVOLUTIONARY</p>
-        <p>ROOTS. RHYTHM. REBIRTH.</p>
-        <h1>Where heritage meets the future of African sound.</h1>
-        <p>Maris Quti belongs to the latter.</p>
-        <p>Born Chimaobi Martins Abonyi, the Nigerian artist is developing a sound that sits at the intersection of contemporary Afrosounds, Afro-fusion and the timeless spirit of Highlife. His music carries the energy of modern African pop while remaining connected to culture, language, spirituality and the stories that have shaped generations.</p>
-        <p>For Quti, music is not simply entertainment. It is identity.</p>
-        <div class="hero-actions"><a class="button primary" href="#music">Explore the EPK</a><a class="button secondary" href="https://music.apple.com/us/artist/maris-quti/1816755808" target="_blank" rel="noreferrer">Listen on Apple Music</a><a class="button secondary" href="/contact">Contact / bookings</a></div>
+      <div class="hero-content">
+        <div class="hero-copy">
+          <p class="eyebrow">THE HIGH LIFE REVOLUTIONARY</p>
+          <p>ROOTS. RHYTHM. REBIRTH.</p>
+          <h1>Where heritage meets the future of African sound.</h1>
+      
+          <p>Born Chimaobi Martins Abonyi, the Nigerian artist is developing a sound that sits at the intersection of contemporary Afrosounds, Afro-fusion and the timeless spirit of Highlife. His music carries the energy of modern African pop while remaining connected to culture, language, spirituality and the stories that have shaped generations.</p>
+          <p>For Quti, music is not simply entertainment. It is identity.</p>
+          <div class="hero-actions"><a class="button primary" href="#music">Explore the EPK</a>
+              <a class="button secondary" href="https://music.apple.com/us/artist/maris-quti/1816755808" target="_blank" rel="noreferrer">Listen on Apple Music</a>
+              <a class="button secondary" href="https://open.spotify.com/artist/6batoltTGlN2NYzRhkhxKF?si=VI5LJF9zR4q5zTLPAMFE6w&utm_source=copy-link" target="_blank" rel="noreferrer">Listen on Spotify Music</a>
+              <a class="button secondary" href="/contact">Contact / bookings</a></div>
+        </div>
       </div>
     </section>
     <main class="content" id="music">
       <div class="section-head"><h2>Featured music</h2><p>Recent releases, live energy, and a catalog built for repeat listens.</p></div>
-      <div class="grid"><article class="card"><strong>Run the Lights</strong><span>Single · Spotify</span></article><article class="card"><strong>Midnight Signal</strong><span>Single · Apple Music</span></article><article class="card"><strong>Afterglow</strong><span>Single · YouTube</span></article></div>
+      <div id="featuredMusic" class="grid"><article class="card"><strong>Run the Lights</strong><span>Single · Spotify</span></article><article class="card"><strong>Midnight Signal</strong><span>Single · Apple Music</span></article><article class="card"><strong>Afterglow</strong><span>Single · YouTube</span></article></div>
       <section class="gallery" id="gallery">
         <div class="section-head"><h2>Gallery</h2><p>Recent images and live moments from the artist dashboard.</p></div>
         <div id="publicGallery" class="gallery-grid"><p class="gallery-empty">No media uploaded yet.</p></div>
@@ -90,7 +126,36 @@
     <footer>© 2026 Marisquti /ROOTS. RHYTHM. REBIRTH. </footer>
     <script>
       const publicGallery = document.getElementById('publicGallery');
+      const featuredMusic = document.getElementById('featuredMusic');
       const apiBase = ['5500', '5501'].includes(window.location.port) ? 'http://localhost:3003' : '';
+      
+      const loadLogo = async () => {
+        try {
+          const response = await fetch('/api/artist');
+          if (!response.ok) throw new Error('Unable to load logo');
+          const artist = await response.json();
+          const navLogo = document.getElementById('navLogo');
+          if (navLogo && artist.profileImageUrl) {
+            navLogo.innerHTML = `<img src="${artist.profileImageUrl}" alt="Profile picture" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" />`;
+          }
+        } catch {
+          // Keep default placeholder if loading fails
+        }
+      };
+      
+      const loadFeaturedMusic = async () => {
+        try {
+          const response = await fetch('/api/music');
+          if (!response.ok) throw new Error('Unable to load music');
+          const tracks = await response.json();
+          if (!tracks.length) return;
+          featuredMusic.innerHTML = tracks.map((track) => `<article class="card"><strong>${track.title}</strong><span>${track.platform}${track.musicUrl ? ` · <a href="${track.musicUrl}" target="_blank" rel="noreferrer" class="music-link">Listen</a>` : ''}</span></article>`).join('');
+        } catch (error) {
+          console.error('Failed to load music:', error);
+          // Keep default cards if loading fails
+        }
+      };
+      
       const loadPublicGallery = async () => {
         try {
           const response = await fetch('/api/media');
@@ -119,6 +184,8 @@
           publicGallery.innerHTML = '<p class="gallery-empty">Gallery is temporarily unavailable.</p>';
         }
       };
+      loadLogo();
+      loadFeaturedMusic();
       loadPublicGallery();
 
       const bookingForm = document.getElementById('bookingForm');

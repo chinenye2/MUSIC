@@ -5,12 +5,19 @@ const fs = require('fs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
+const bcrypt = require('bcrypt');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const port = process.env.PORT || 5000;
 const dbPath = path.join(__dirname, 'artist-dashboard.db');
 const uploadDir = path.join(__dirname, 'uploads');
 const authCookieName = 'artist_session';
+const sessionSecret = 'force-logout-' + crypto.randomBytes(32).toString('hex');
+
+app.use(cookieParser(sessionSecret));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -58,9 +65,39 @@ app.use((req, res, next) => {
   return next();
 });
 
-app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 app.use('/uploads', express.static(uploadDir));
+
+const authenticateUser = (req, res, next) => {
+  const sessionCookie = req.cookies[authCookieName];
+  
+  if (!sessionCookie) {
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    return res.redirect('/login');
+  }
+
+  try {
+    const sessionData = JSON.parse(Buffer.from(sessionCookie, 'base64').toString());
+    
+    if (sessionData.expiresAt < Date.now()) {
+      res.clearCookie(authCookieName);
+      if (req.path.startsWith('/api/')) {
+        return res.status(401).json({ error: 'Session expired' });
+      }
+      return res.redirect('/login');
+    }
+    req.user = sessionData;
+    next();
+  } catch (error) {
+    res.clearCookie(authCookieName);
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ error: 'Invalid session' });
+    }
+    return res.redirect('/login');
+  }
+};
 
 const dbReady = seedDatabase();
 
@@ -114,10 +151,16 @@ async function seedDatabase() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
       name TEXT,
       createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  const userColumns = await all('PRAGMA table_info(users)');
+  if (!userColumns.some((column) => column.name === 'password')) {
+    await run('ALTER TABLE users ADD COLUMN password TEXT');
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -140,6 +183,8 @@ async function seedDatabase() {
       location TEXT NOT NULL,
       bioStatus TEXT NOT NULL,
       profileCompletion INTEGER NOT NULL DEFAULT 0,
+      profileImageUrl TEXT,
+      logoImageUrl TEXT,
       updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -149,6 +194,12 @@ async function seedDatabase() {
     await run('ALTER TABLE artists ADD COLUMN updatedAt TEXT');
     await run('UPDATE artists SET updatedAt = CURRENT_TIMESTAMP WHERE updatedAt IS NULL');
   }
+  if (!artistColumns.some((column) => column.name === 'profileImageUrl')) {
+    await run('ALTER TABLE artists ADD COLUMN profileImageUrl TEXT');
+  }
+  if (!artistColumns.some((column) => column.name === 'logoImageUrl')) {
+    await run('ALTER TABLE artists ADD COLUMN logoImageUrl TEXT');
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS music (
@@ -156,9 +207,19 @@ async function seedDatabase() {
       title TEXT NOT NULL,
       platform TEXT NOT NULL,
       status TEXT NOT NULL,
+      videoUrl TEXT,
+      musicUrl TEXT,
       createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  const musicColumns = await all('PRAGMA table_info(music)');
+  if (!musicColumns.some((column) => column.name === 'videoUrl')) {
+    await run('ALTER TABLE music ADD COLUMN videoUrl TEXT');
+  }
+  if (!musicColumns.some((column) => column.name === 'musicUrl')) {
+    await run('ALTER TABLE music ADD COLUMN musicUrl TEXT');
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS events (
@@ -167,9 +228,27 @@ async function seedDatabase() {
       date TEXT NOT NULL,
       city TEXT NOT NULL,
       type TEXT NOT NULL,
+      ticketUrl TEXT,
+      imageUrl TEXT,
+      imageNotes TEXT,
+      videoUrl TEXT,
       createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  const eventColumns = await all('PRAGMA table_info(events)');
+  if (!eventColumns.some((column) => column.name === 'ticketUrl')) {
+    await run('ALTER TABLE events ADD COLUMN ticketUrl TEXT');
+  }
+  if (!eventColumns.some((column) => column.name === 'imageUrl')) {
+    await run('ALTER TABLE events ADD COLUMN imageUrl TEXT');
+  }
+  if (!eventColumns.some((column) => column.name === 'imageNotes')) {
+    await run('ALTER TABLE events ADD COLUMN imageNotes TEXT');
+  }
+  if (!eventColumns.some((column) => column.name === 'videoUrl')) {
+    await run('ALTER TABLE events ADD COLUMN videoUrl TEXT');
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -203,9 +282,15 @@ async function seedDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source TEXT NOT NULL,
       detail TEXT NOT NULL,
+      videoUrl TEXT,
       createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  const pressColumns = await all('PRAGMA table_info(press)');
+  if (!pressColumns.some((column) => column.name === 'videoUrl')) {
+    await run('ALTER TABLE press ADD COLUMN videoUrl TEXT');
+  }
 
   const pressRows = await all('SELECT * FROM press');
   if (pressRows.length === 0) {
@@ -267,6 +352,8 @@ async function getArtistProfile() {
     location: artist.location,
     bioStatus: artist.bioStatus,
     profileCompletion: artist.profileCompletion,
+    profileImageUrl: artist.profileImageUrl,
+    logoImageUrl: artist.logoImageUrl,
     updatedAt: artist.updatedAt,
     tracks,
     events,
@@ -432,7 +519,108 @@ app.post('/api/auth/logout', (req, res) => {
   return res.json({ success: true });
 });
 
-app.get('/api/artist', async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const user = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const sessionData = {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    };
+
+    const sessionCookie = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    res.cookie(authCookieName, sessionCookie, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({ 
+      success: true, 
+      user: { id: user.id, email: user.email, name: user.name } 
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password, name } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  try {
+    const existingUser = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+    if (existingUser) {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await run(
+      'INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
+      [email.toLowerCase(), hashedPassword, name || email.split('@')[0]]
+    );
+
+    const newUser = await get('SELECT * FROM users WHERE id = ?', [result.id]);
+    
+    const sessionData = {
+      userId: newUser.id,
+      email: newUser.email,
+      name: newUser.name,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000
+    };
+
+    const sessionCookie = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    res.cookie(authCookieName, sessionCookie, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(201).json({ 
+      success: true, 
+      user: { id: newUser.id, email: newUser.email, name: newUser.name } 
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/login', (req, res) => {
+  res.clearCookie(authCookieName, { path: '/' });
+  res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+app.get('/force-logout', (req, res) => {
+  res.clearCookie(authCookieName, { path: '/' });
+  res.send('Session cleared. <a href="/dashboard">Try dashboard now</a>');
+});
+
+app.get('/api/artist', authenticateUser, async (req, res) => {
   try {
     const artist = await getArtistProfile();
     res.json(artist);
@@ -441,8 +629,8 @@ app.get('/api/artist', async (req, res) => {
   }
 });
 
-app.put('/api/artist', async (req, res) => {
-  const { name, stageName, genre, location, bioStatus, profileCompletion } = req.body || {};
+app.put('/api/artist', authenticateUser, async (req, res) => {
+  const { name, stageName, genre, location, bioStatus, profileCompletion, profileImageUrl, logoImageUrl } = req.body || {};
 
   try {
     await run(
@@ -453,9 +641,11 @@ app.put('/api/artist', async (req, res) => {
            location = COALESCE(?, location),
            bioStatus = COALESCE(?, bioStatus),
            profileCompletion = COALESCE(?, profileCompletion),
+           profileImageUrl = COALESCE(?, profileImageUrl),
+           logoImageUrl = COALESCE(?, logoImageUrl),
            updatedAt = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [name, stageName, genre, location, bioStatus, profileCompletion, 'aster-vale']
+      [name, stageName, genre, location, bioStatus, profileCompletion, profileImageUrl, logoImageUrl, 'aster-vale']
     );
 
     res.json(await getArtistProfile());
@@ -464,7 +654,43 @@ app.put('/api/artist', async (req, res) => {
   }
 });
 
-app.get('/api/music', async (req, res) => {
+app.put('/api/artist/profile-image', authenticateUser, async (req, res) => {
+  const { profileImageUrl } = req.body || {};
+
+  try {
+    await run(
+      `UPDATE artists
+       SET profileImageUrl = COALESCE(?, profileImageUrl),
+           updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [profileImageUrl, 'aster-vale']
+    );
+
+    res.json(await getArtistProfile());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/artist/logo-image', authenticateUser, async (req, res) => {
+  const { logoImageUrl } = req.body || {};
+
+  try {
+    await run(
+      `UPDATE artists
+       SET logoImageUrl = COALESCE(?, logoImageUrl),
+           updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [logoImageUrl, 'aster-vale']
+    );
+
+    res.json(await getArtistProfile());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/music', authenticateUser, async (req, res) => {
   try {
     const tracks = await all('SELECT * FROM music ORDER BY createdAt DESC');
     res.json(tracks);
@@ -473,8 +699,8 @@ app.get('/api/music', async (req, res) => {
   }
 });
 
-app.post('/api/music', async (req, res) => {
-  const { title, platform, status } = req.body || {};
+app.post('/api/music', authenticateUser, async (req, res) => {
+  const { title, platform, status, videoUrl, musicUrl } = req.body || {};
 
   if (!title || !platform || !status) {
     res.status(400).json({ error: 'title, platform, and status are required' });
@@ -483,8 +709,8 @@ app.post('/api/music', async (req, res) => {
 
   try {
     const result = await run(
-      'INSERT INTO music (title, platform, status) VALUES (?, ?, ?)',
-      [title, platform, status]
+      'INSERT INTO music (title, platform, status, videoUrl, musicUrl) VALUES (?, ?, ?, ?, ?)',
+      [title, platform, status, videoUrl || null, musicUrl || null]
     );
 
     const song = await get('SELECT * FROM music WHERE id = ?', [result.id]);
@@ -494,17 +720,19 @@ app.post('/api/music', async (req, res) => {
   }
 });
 
-app.put('/api/music/:id', async (req, res) => {
-  const { title, platform, status } = req.body || {};
+app.put('/api/music/:id', authenticateUser, async (req, res) => {
+  const { title, platform, status, videoUrl, musicUrl } = req.body || {};
 
   try {
     await run(
       `UPDATE music
        SET title = COALESCE(?, title),
            platform = COALESCE(?, platform),
-           status = COALESCE(?, status)
+           status = COALESCE(?, status),
+           videoUrl = COALESCE(?, videoUrl),
+           musicUrl = COALESCE(?, musicUrl)
        WHERE id = ?`,
-      [title, platform, status, Number(req.params.id)]
+      [title, platform, status, videoUrl, musicUrl, Number(req.params.id)]
     );
 
     const row = await get('SELECT * FROM music WHERE id = ?', [Number(req.params.id)]);
@@ -514,7 +742,7 @@ app.put('/api/music/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/music/:id', async (req, res) => {
+app.delete('/api/music/:id', authenticateUser, async (req, res) => {
   try {
     await run('DELETE FROM music WHERE id = ?', [Number(req.params.id)]);
     res.json({ success: true });
@@ -523,7 +751,7 @@ app.delete('/api/music/:id', async (req, res) => {
   }
 });
 
-app.get('/api/events', async (req, res) => {
+app.get('/api/events', authenticateUser, async (req, res) => {
   try {
     const list = await all('SELECT * FROM events ORDER BY date ASC');
     res.json(list);
@@ -532,8 +760,8 @@ app.get('/api/events', async (req, res) => {
   }
 });
 
-app.post('/api/events', async (req, res) => {
-  const { title, date, city, type } = req.body || {};
+app.post('/api/events', authenticateUser, async (req, res) => {
+  const { title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl } = req.body || {};
 
   if (!title || !date || !city || !type) {
     res.status(400).json({ error: 'title, date, city, and type are required' });
@@ -542,8 +770,8 @@ app.post('/api/events', async (req, res) => {
 
   try {
     const result = await run(
-      'INSERT INTO events (title, date, city, type) VALUES (?, ?, ?, ?)',
-      [title, date, city, type]
+      'INSERT INTO events (title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [title, date, city, type, ticketUrl || null, imageUrl || null, imageNotes || null, videoUrl || null]
     );
 
     const event = await get('SELECT * FROM events WHERE id = ?', [result.id]);
@@ -553,8 +781,8 @@ app.post('/api/events', async (req, res) => {
   }
 });
 
-app.put('/api/events/:id', async (req, res) => {
-  const { title, date, city, type } = req.body || {};
+app.put('/api/events/:id', authenticateUser, async (req, res) => {
+  const { title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl } = req.body || {};
 
   try {
     await run(
@@ -562,9 +790,13 @@ app.put('/api/events/:id', async (req, res) => {
        SET title = COALESCE(?, title),
            date = COALESCE(?, date),
            city = COALESCE(?, city),
-           type = COALESCE(?, type)
+           type = COALESCE(?, type),
+           ticketUrl = COALESCE(?, ticketUrl),
+           imageUrl = COALESCE(?, imageUrl),
+           imageNotes = COALESCE(?, imageNotes),
+           videoUrl = COALESCE(?, videoUrl)
        WHERE id = ?`,
-      [title, date, city, type, Number(req.params.id)]
+      [title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl, Number(req.params.id)]
     );
 
     const event = await get('SELECT * FROM events WHERE id = ?', [Number(req.params.id)]);
@@ -577,7 +809,7 @@ app.put('/api/events/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/events/:id', async (req, res) => {
+app.delete('/api/events/:id', authenticateUser, async (req, res) => {
   try {
     await run('DELETE FROM events WHERE id = ?', [Number(req.params.id)]);
     return res.json({ success: true });
@@ -616,7 +848,7 @@ app.post('/api/messages', async (req, res) => {
   }
 });
 
-app.put('/api/messages/:id', async (req, res) => {
+app.put('/api/messages/:id', authenticateUser, async (req, res) => {
   const { sender, message, unread } = req.body || {};
 
   try {
@@ -639,7 +871,7 @@ app.put('/api/messages/:id', async (req, res) => {
   }
 });
 
-app.put('/api/messages/:id/read', async (req, res) => {
+app.put('/api/messages/:id/read', authenticateUser, async (req, res) => {
   try {
     await run('UPDATE messages SET unread = 0 WHERE id = ?', [Number(req.params.id)]);
     const item = await get('SELECT * FROM messages WHERE id = ?', [Number(req.params.id)]);
@@ -658,7 +890,7 @@ app.get('/api/media', async (req, res) => {
   }
 });
 
-app.post('/api/media', mediaUpload.single('media'), async (req, res) => {
+app.post('/api/media', authenticateUser, mediaUpload.single('media'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Choose an image or video file' });
   }
@@ -676,7 +908,7 @@ app.post('/api/media', mediaUpload.single('media'), async (req, res) => {
   }
 });
 
-app.delete('/api/media/:id', async (req, res) => {
+app.delete('/api/media/:id', authenticateUser, async (req, res) => {
   try {
     const item = await get('SELECT * FROM media WHERE id = ?', [Number(req.params.id)]);
     if (!item) {
@@ -690,7 +922,7 @@ app.delete('/api/media/:id', async (req, res) => {
   }
 });
 
-app.post('/api/media/:id/like', async (req, res) => {
+app.post('/api/media/:id/like', authenticateUser, async (req, res) => {
   try {
     await run('UPDATE media SET likes = likes + 1 WHERE id = ?', [Number(req.params.id)]);
     const item = await get('SELECT * FROM media WHERE id = ?', [Number(req.params.id)]);
@@ -703,14 +935,154 @@ app.post('/api/media/:id/like', async (req, res) => {
   }
 });
 
-app.post('/api/press', async (req, res) => {
-  const { source, detail } = req.body || {};
+const eventImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      callback(null, `event-${crypto.randomUUID()}${extension}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    callback(null, file.mimetype.startsWith('image/'));
+  },
+});
+
+app.post('/api/event-image', authenticateUser, eventImageUpload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Choose an image file' });
+  }
+
+  try {
+    const imageUrl = `/uploads/${req.file.filename}`;
+    return res.status(201).json({ imageUrl });
+  } catch (error) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+const profileImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      callback(null, `profile-${crypto.randomUUID()}${extension}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    callback(null, file.mimetype.startsWith('image/'));
+  },
+});
+
+app.post('/api/profile-image', authenticateUser, profileImageUpload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Choose an image file' });
+  }
+
+  try {
+    const imageUrl = `/uploads/${req.file.filename}`;
+    return res.status(201).json({ imageUrl });
+  } catch (error) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+const logoImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      callback(null, `logo-${crypto.randomUUID()}${extension}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    callback(null, file.mimetype.startsWith('image/'));
+  },
+});
+
+app.post('/api/logo-image', authenticateUser, logoImageUpload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Choose an image file' });
+  }
+
+  try {
+    const imageUrl = `/uploads/${req.file.filename}`;
+    return res.status(201).json({ imageUrl });
+  } catch (error) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+const eventVideoUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      callback(null, `event-video-${crypto.randomUUID()}${extension}`);
+    },
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    callback(null, file.mimetype.startsWith('video/'));
+  },
+});
+
+app.post('/api/event-video', authenticateUser, eventVideoUpload.single('video'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Choose a video file' });
+  }
+
+  try {
+    const videoUrl = `/uploads/${req.file.filename}`;
+    return res.status(201).json({ videoUrl });
+  } catch (error) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+const pressVideoUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      callback(null, `press-video-${crypto.randomUUID()}${extension}`);
+    },
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    callback(null, file.mimetype.startsWith('video/'));
+  },
+});
+
+app.post('/api/press-video', authenticateUser, pressVideoUpload.single('video'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Choose a video file' });
+  }
+
+  try {
+    const videoUrl = `/uploads/${req.file.filename}`;
+    return res.status(201).json({ videoUrl });
+  } catch (error) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/press', authenticateUser, async (req, res) => {
+  const { source, detail, videoUrl } = req.body || {};
   if (!source || !detail) {
     return res.status(400).json({ error: 'source and detail are required' });
   }
 
   try {
-    const result = await run('INSERT INTO press (source, detail) VALUES (?, ?)', [source, detail]);
+    const result = await run('INSERT INTO press (source, detail, videoUrl) VALUES (?, ?, ?)', [source, detail, videoUrl || null]);
     const item = await get('SELECT * FROM press WHERE id = ?', [result.id]);
     return res.status(201).json(item);
   } catch (error) {
@@ -718,7 +1090,7 @@ app.post('/api/press', async (req, res) => {
   }
 });
 
-app.delete('/api/press/:id', async (req, res) => {
+app.delete('/api/press/:id', authenticateUser, async (req, res) => {
   try {
     await run('DELETE FROM press WHERE id = ?', [Number(req.params.id)]);
     return res.json({ success: true });
@@ -731,7 +1103,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', authenticateUser, (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
