@@ -67,6 +67,7 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname)));
 app.use('/uploads', express.static(uploadDir));
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 const authenticateUser = (req, res, next) => {
   const sessionCookie = req.cookies[authCookieName];

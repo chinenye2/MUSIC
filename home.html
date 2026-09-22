@@ -15,7 +15,17 @@
       body { margin: 0; color: var(--ink); background: var(--paper); font-family: 'DM Sans', sans-serif; }
       a { color: inherit; }
       .hero { min-height: 78vh; padding: 28px clamp(22px, 5vw, 80px) 42px; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(135deg, #f2efe8, #d9e5d7 58%, #c9dff0); }
-      .hero-content { flex: 1; }
+      .hero-content { flex: 1; display: flex; align-items: center; gap: 40px; }
+      .hero-image { flex: 0 0 auto; max-width: 500px; order: 2; opacity: 0; transform: translateX(50px); animation: heroImageAnimation 1s ease-out forwards; }
+      .hero-image img { width: 100%; height: auto; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); object-fit: contain; }
+      .hero-copy { flex: 1; order: 1; }
+      
+      @keyframes heroImageAnimation {
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
       .hero-copy { max-width: 780px; padding: 10vh 0 4vh; }
       .eyebrow { margin: 0 0 18px; color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
       h1, h2 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.07em; }
@@ -86,6 +96,9 @@
       /* Enhanced responsive design for public EPK */
       @media (max-width: 1024px) {
         .hero { padding: 24px clamp(20px, 4vw, 60px) 36px; }
+        .hero-content { gap: 30px; }
+        .hero-image { max-width: 450px; opacity: 0; transform: translateX(40px); animation: heroImageAnimation 1s ease-out forwards; }
+        .hero-image img { height: auto; border-radius: 18px; }
         .content { padding: 48px clamp(20px, 4vw, 60px); }
         .grid, .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
         .section-head h2 { font-size: clamp(1.8rem, 4vw, 3.5rem); }
@@ -96,8 +109,10 @@
 
       @media (max-width: 768px) {
         .hero { min-height: 80vh; padding: 20px clamp(18px, 4vw, 50px) 32px; }
-        .hero-content { text-align: center; }
-        .hero-copy { padding: 6vh 0; max-width: 100%; }
+        .hero-content { flex-direction: column; text-align: center; gap: 24px; }
+        .hero-image { max-width: 400px; order: 1; opacity: 0; transform: translateY(30px); animation: heroImageAnimationMobile 1s ease-out forwards; }
+        .hero-image img { height: auto; }
+        .hero-copy { padding: 4vh 0; max-width: 100%; order: 0; }
         .hero-copy p { max-width: 100%; font-size: 1rem; }
         .hero-actions { justify-content: center; }
         .nav { flex-direction: column; gap: 12px; text-align: center; }
@@ -115,9 +130,19 @@
         .booking-form input, .booking-form textarea { padding: 0.8rem; }
         footer { padding: 20px clamp(18px, 4vw, 50px); }
       }
+      
+      @keyframes heroImageAnimationMobile {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
 
       @media (max-width: 640px) {
         .hero { min-height: 75vh; padding: 16px clamp(16px, 4vw, 40px) 28px; }
+        .hero-content { gap: 20px; }
+        .hero-image { max-width: 350px; opacity: 0; transform: translateY(25px); animation: heroImageAnimationMobile 1s ease-out forwards; }
+        .hero-image img { height: auto; border-radius: 16px; }
         .hero-copy { padding: 4vh 0; }
         .hero-copy p { font-size: 0.95rem; }
         .hero-actions { gap: 10px; }
@@ -140,6 +165,10 @@
 
       @media (max-width: 480px) {
         .hero { min-height: 70vh; padding: 14px clamp(14px, 4vw, 32px) 24px; }
+        .hero-content { gap: 16px; }
+        .hero-image { max-width: 300px; opacity: 0; transform: translateY(20px); animation: heroImageAnimationMobile 1s ease-out forwards; }
+        .hero-image img { height: auto; border-radius: 14px; }
+        .hero-copy { padding: 3vh 0; }
         .hero-copy p { font-size: 0.9rem; }
         .hero-actions { flex-direction: column; width: 100%; }
         .button { width: 100%; padding: 0.7rem 1rem; }
@@ -211,6 +240,9 @@
               <a class="button secondary" href="https://music.apple.com/us/artist/maris-quti/1816755808" target="_blank" rel="noreferrer">Listen on Apple Music</a>
               <a class="button secondary" href="https://open.spotify.com/artist/6batoltTGlN2NYzRhkhxKF?si=VI5LJF9zR4q5zTLPAMFE6w&utm_source=copy-link" target="_blank" rel="noreferrer">Listen on Spotify Music</a>
               <a class="button secondary" href="/contact">Contact / bookings</a></div>
+        </div>
+        <div class="hero-image">
+          <img src="images/artistimage.jpeg" alt="Maris Quti Artist Portrait" />
         </div>
       </div>
     </section>
