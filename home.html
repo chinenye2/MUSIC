@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Aster Vale electronic press kit." />
+    <meta name="theme-color" content="#f2efe8" />
     <title>Aster Vale | Electronic Press Kit</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -81,7 +82,115 @@
       .music-link { color: var(--ink); text-decoration: none; font-weight: 700; }
       .music-link:hover { text-decoration: underline; }
       footer { padding: 24px clamp(22px, 5vw, 80px); border-top: 1px solid var(--line); color: var(--muted); }
-      @media (max-width: 700px) { .hero { min-height: 84vh; } .hero-content { text-align: center; } .hero-copy { padding: 4vh 0; } .grid, .gallery-grid { grid-template-columns: 1fr; } .section-head { display: block; } .section-head p { margin-top: 12px; } }
+      
+      /* Enhanced responsive design for public EPK */
+      @media (max-width: 1024px) {
+        .hero { padding: 24px clamp(20px, 4vw, 60px) 36px; }
+        .content { padding: 48px clamp(20px, 4vw, 60px); }
+        .grid, .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .section-head h2 { font-size: clamp(1.8rem, 4vw, 3.5rem); }
+        .card { min-height: 200px; padding: 18px; }
+        .gallery-item { min-height: 220px; }
+        .booking-form { max-width: 100%; }
+      }
+
+      @media (max-width: 768px) {
+        .hero { min-height: 80vh; padding: 20px clamp(18px, 4vw, 50px) 32px; }
+        .hero-content { text-align: center; }
+        .hero-copy { padding: 6vh 0; max-width: 100%; }
+        .hero-copy p { max-width: 100%; font-size: 1rem; }
+        .hero-actions { justify-content: center; }
+        .nav { flex-direction: column; gap: 12px; text-align: center; }
+        .nav-links { display: flex; flex-direction: column; gap: 8px; }
+        .content { padding: 36px clamp(18px, 4vw, 50px); }
+        .grid, .gallery-grid { grid-template-columns: 1fr; gap: 14px; }
+        .section-head { flex-direction: column; align-items: flex-start; gap: 12px; }
+        .section-head p { max-width: 100%; margin-top: 8px; }
+        .section-head h2 { font-size: clamp(1.5rem, 5vw, 3rem); }
+        .card { min-height: 180px; padding: 16px; }
+        .card strong { font-size: 1.2rem; }
+        .gallery-item { min-height: 200px; }
+        .booking-form { gap: 12px; }
+        .booking-form label { font-size: 0.8rem; }
+        .booking-form input, .booking-form textarea { padding: 0.8rem; }
+        footer { padding: 20px clamp(18px, 4vw, 50px); }
+      }
+
+      @media (max-width: 640px) {
+        .hero { min-height: 75vh; padding: 16px clamp(16px, 4vw, 40px) 28px; }
+        .hero-copy { padding: 4vh 0; }
+        .hero-copy p { font-size: 0.95rem; }
+        .hero-actions { gap: 10px; }
+        .button { padding: 0.6rem 0.9rem; font-size: 0.85rem; }
+        .mark { width: 36px; height: 36px; }
+        .brand { font-size: 0.9rem; }
+        .content { padding: 28px clamp(16px, 4vw, 40px); }
+        .section-head h2 { font-size: clamp(1.3rem, 6vw, 2.5rem); }
+        .card { min-height: 160px; padding: 14px; }
+        .card strong { font-size: 1.1rem; }
+        .card span { font-size: 0.85rem; }
+        .gallery-item { min-height: 180px; }
+        .gallery-actions { padding: 8px; }
+        .gallery-actions button, .gallery-actions a { padding: 0.4rem 0.6rem; font-size: 0.72rem; }
+        .booking-form { gap: 10px; }
+        .booking-form input, .booking-form textarea { padding: 0.75rem; font-size: 0.9rem; }
+        .booking-form textarea { min-height: 110px; }
+        footer { padding: 16px clamp(16px, 4vw, 40px); font-size: 0.85rem; }
+      }
+
+      @media (max-width: 480px) {
+        .hero { min-height: 70vh; padding: 14px clamp(14px, 4vw, 32px) 24px; }
+        .hero-copy p { font-size: 0.9rem; }
+        .hero-actions { flex-direction: column; width: 100%; }
+        .button { width: 100%; padding: 0.7rem 1rem; }
+        .mark { width: 32px; height: 32px; }
+        .content { padding: 24px clamp(14px, 4vw, 32px); }
+        .section-head { border-bottom-width: 1px; padding-bottom: 14px; }
+        .section-head h2 { font-size: clamp(1.2rem, 7vw, 2rem); }
+        .section-head p { font-size: 0.85rem; }
+        .card { min-height: 140px; padding: 12px; border-radius: 14px; }
+        .card strong { font-size: 1rem; }
+        .card span { font-size: 0.8rem; }
+        .gallery-item { min-height: 160px; border-radius: 14px; }
+        .gallery-actions { padding: 6px; gap: 6px; }
+        .gallery-actions button, .gallery-actions a { padding: 0.35rem 0.55rem; font-size: 0.68rem; }
+        .booking-form { gap: 8px; }
+        .booking-form label { font-size: 0.75rem; }
+        .booking-form input, .booking-form textarea { padding: 0.7rem; font-size: 0.85rem; }
+        .booking-form textarea { min-height: 100px; }
+        .booking-status { font-size: 0.8rem; }
+        footer { padding: 14px clamp(14px, 4vw, 32px); font-size: 0.8rem; }
+      }
+
+      @media (max-width: 360px) {
+        .hero { padding: 12px clamp(12px, 4vw, 28px) 20px; }
+        .hero-copy { padding: 3vh 0; }
+        .eyebrow { font-size: 0.7rem; }
+        h1 { font-size: clamp(2rem, 8vw, 4rem); }
+        .content { padding: 20px clamp(12px, 4vw, 28px); }
+        .card { min-height: 120px; padding: 10px; }
+        .gallery-item { min-height: 140px; }
+        .booking-form textarea { min-height: 90px; }
+      }
+
+      /* Landscape orientation */
+      @media (max-height: 500px) and (orientation: landscape) {
+        .hero { min-height: 60vh; padding: 12px clamp(16px, 4vw, 40px) 16px; }
+        .hero-copy { padding: 2vh 0; }
+        .hero-copy p { font-size: 0.85rem; margin: 16px 0 0; }
+        .hero-actions { margin-top: 16px; }
+        .content { padding: 20px clamp(16px, 4vw, 40px); }
+        .section-head { padding-bottom: 12px; }
+        .card { min-height: 120px; }
+        .gallery-item { min-height: 140px; }
+      }
+
+      /* Touch device optimizations */
+      @media (hover: none) and (pointer: coarse) {
+        .button:hover { transform: none; box-shadow: none; }
+        .button:active { transform: scale(0.98); }
+        .gallery-actions button:active, .gallery-actions a:active { background: var(--ink); color: var(--paper); }
+      }
     </style>
   </head>
   <body>

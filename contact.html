@@ -2,8 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="Contact Marisquti for bookings, press, and collaborations." />
+    <meta name="theme-color" content="#f2efe8" />
     <title>Contact | Marisquti</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -34,7 +35,99 @@
       textarea { min-height: 150px; resize: vertical; }
       button { border: 0; border-radius: 999px; padding: 0.85rem 1.2rem; background: var(--ink); color: var(--paper); font: inherit; font-weight: 700; cursor: pointer; }
       .status { min-height: 1.4em; color: var(--muted); }
-      @media (max-width: 760px) { .layout { grid-template-columns: 1fr; gap: 34px; padding-top: 12vh; } .nav-links { gap: 10px; font-size: 0.9rem; } }
+      
+      /* Enhanced responsive design for contact page */
+      @media (max-width: 1024px) {
+        .shell { width: min(100%, calc(100% - 40px)); padding: 24px 0 50px; }
+        .layout { gap: 40px; padding-top: 12vh; }
+        h1 { font-size: clamp(2.5rem, 7vw, 5rem); }
+        .form-wrap { padding: 24px; }
+      }
+
+      @media (max-width: 768px) {
+        .shell { width: calc(100% - 32px); padding: 20px 0 40px; }
+        .nav { flex-direction: column; gap: 12px; text-align: center; }
+        .nav-links { gap: 12px; font-size: 0.9rem; flex-wrap: wrap; justify-content: center; }
+        .layout { grid-template-columns: 1fr; gap: 30px; padding-top: 10vh; }
+        h1 { font-size: clamp(2rem, 8vw, 4rem); }
+        .intro { font-size: 1rem; margin-top: 20px; }
+        .details { margin-top: 32px; gap: 12px; }
+        .form-wrap { padding: 20px; }
+        h2 { font-size: 1.8rem; margin-bottom: 18px; }
+        form { gap: 12px; }
+        label { font-size: 0.8rem; }
+        input, textarea { padding: 0.8rem; }
+        textarea { min-height: 120px; }
+        button { padding: 0.8rem 1.1rem; font-size: 0.9rem; }
+      }
+
+      @media (max-width: 640px) {
+        .shell { width: calc(100% - 28px); padding: 18px 0 36px; }
+        .mark { width: 36px; height: 36px; }
+        .brand { font-size: 0.9rem; }
+        .layout { gap: 24px; padding-top: 8vh; }
+        .eyebrow { font-size: 0.7rem; }
+        h1 { font-size: clamp(1.8rem, 9vw, 3.5rem); }
+        .intro { font-size: 0.95rem; max-width: 100%; }
+        .details { margin-top: 24px; }
+        .form-wrap { padding: 18px; border-radius: 16px; }
+        h2 { font-size: 1.5rem; margin-bottom: 16px; }
+        form { gap: 10px; }
+        label { font-size: 0.75rem; }
+        input, textarea { padding: 0.75rem; font-size: 0.9rem; }
+        textarea { min-height: 100px; }
+        button { padding: 0.75rem 1rem; font-size: 0.85rem; width: 100%; }
+        .status { font-size: 0.85rem; }
+      }
+
+      @media (max-width: 480px) {
+        .shell { width: calc(100% - 24px); padding: 16px 0 32px; }
+        .nav { gap: 10px; }
+        .nav-links { gap: 8px; font-size: 0.85rem; }
+        .mark { width: 32px; height: 32px; }
+        .brand { font-size: 0.85rem; }
+        .layout { gap: 20px; padding-top: 6vh; }
+        .eyebrow { font-size: 0.65rem; }
+        h1 { font-size: clamp(1.5rem, 10vw, 3rem); }
+        .intro { font-size: 0.9rem; margin-top: 16px; }
+        .details { margin-top: 20px; font-size: 0.9rem; }
+        .form-wrap { padding: 16px; border-radius: 14px; }
+        h2 { font-size: 1.3rem; margin-bottom: 14px; }
+        form { gap: 8px; }
+        label { font-size: 0.7rem; }
+        input, textarea { padding: 0.7rem; font-size: 0.85rem; }
+        textarea { min-height: 90px; }
+        button { padding: 0.7rem 0.9rem; font-size: 0.8rem; }
+      }
+
+      @media (max-width: 360px) {
+        .shell { width: calc(100% - 20px); padding: 14px 0 28px; }
+        .layout { padding-top: 4vh; }
+        h1 { font-size: clamp(1.3rem, 11vw, 2.5rem); }
+        .form-wrap { padding: 14px; }
+        h2 { font-size: 1.2rem; }
+        input, textarea { padding: 0.65rem; }
+        textarea { min-height: 80px; }
+      }
+
+      /* Landscape orientation */
+      @media (max-height: 500px) and (orientation: landscape) {
+        .shell { padding: 12px 0 24px; }
+        .layout { padding-top: 4vh; gap: 20px; }
+        h1 { font-size: clamp(1.5rem, 6vw, 3rem); }
+        .intro { margin-top: 12px; font-size: 0.9rem; }
+        .details { margin-top: 16px; }
+        .form-wrap { padding: 16px; }
+        h2 { font-size: 1.4rem; margin-bottom: 12px; }
+        textarea { min-height: 80px; }
+      }
+
+      /* Touch device optimizations */
+      @media (hover: none) and (pointer: coarse) {
+        button:hover { transform: none; }
+        button:active { transform: scale(0.98); }
+        .nav-links a:active { color: var(--muted); }
+      }
     </style>
   </head>
   <body>

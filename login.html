@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="description" content="Login to artist dashboard" />
+  <meta name="theme-color" content="#0b1020" />
   <title>Login - Artist Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -48,6 +49,211 @@
       border-radius: 22px;
       box-shadow: var(--shadow);
       padding: 40px 32px;
+    }
+
+    /* Responsive improvements for login page */
+    @media (max-width: 640px) {
+      body {
+        padding: 16px;
+      }
+
+      .login-container {
+        padding: 28px 24px;
+        border-radius: 18px;
+      }
+
+      .logo {
+        width: 56px;
+        height: 56px;
+        font-size: 1.3rem;
+        margin-bottom: 16px;
+      }
+
+      .login-header h1 {
+        font-size: 1.5rem;
+      }
+
+      .login-header p {
+        font-size: 0.85rem;
+      }
+
+      .tab-buttons {
+        margin-bottom: 20px;
+        padding: 3px;
+        border-radius: 10px;
+      }
+
+      .tab-button {
+        padding: 10px 14px;
+        font-size: 0.9rem;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-group label {
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+      }
+
+      .form-group input {
+        padding: 12px 14px;
+        font-size: 0.95rem;
+        border-radius: 10px;
+      }
+
+      .button {
+        padding: 14px 18px;
+        font-size: 0.95rem;
+        border-radius: 12px;
+      }
+
+      .error-message,
+      .success-message {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        border-radius: 10px;
+        margin-bottom: 16px;
+      }
+
+      .back-link {
+        margin-top: 20px;
+      }
+
+      .back-link a {
+        font-size: 0.85rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 12px;
+      }
+
+      .login-container {
+        padding: 24px 20px;
+        border-radius: 16px;
+      }
+
+      .logo {
+        width: 48px;
+        height: 48px;
+        font-size: 1.1rem;
+        margin-bottom: 14px;
+      }
+
+      .login-header {
+        margin-bottom: 24px;
+      }
+
+      .login-header h1 {
+        font-size: 1.3rem;
+      }
+
+      .login-header p {
+        font-size: 0.8rem;
+      }
+
+      .tab-buttons {
+        margin-bottom: 18px;
+        gap: 6px;
+      }
+
+      .tab-button {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+        border-radius: 8px;
+      }
+
+      .form-group {
+        margin-bottom: 14px;
+      }
+
+      .form-group label {
+        font-size: 0.8rem;
+      }
+
+      .form-group input {
+        padding: 11px 12px;
+        font-size: 0.9rem;
+      }
+
+      .button {
+        padding: 12px 16px;
+        font-size: 0.9rem;
+      }
+
+      .error-message,
+      .success-message {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        margin-bottom: 14px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .login-container {
+        padding: 20px 16px;
+      }
+
+      .logo {
+        width: 44px;
+        height: 44px;
+        font-size: 1rem;
+      }
+
+      .login-header h1 {
+        font-size: 1.2rem;
+      }
+
+      .tab-button {
+        padding: 8px 10px;
+        font-size: 0.8rem;
+      }
+
+      .form-group input {
+        padding: 10px 11px;
+      }
+
+      .button {
+        padding: 11px 14px;
+      }
+    }
+
+    /* Landscape orientation */
+    @media (max-height: 500px) and (orientation: landscape) {
+      body {
+        padding: 10px;
+        align-items: flex-start;
+      }
+
+      .login-container {
+        padding: 20px 24px;
+        margin-top: 20px;
+      }
+
+      .logo {
+        width: 40px;
+        height: 40px;
+        margin-bottom: 12px;
+      }
+
+      .login-header {
+        margin-bottom: 16px;
+      }
+
+      .login-header h1 {
+        font-size: 1.2rem;
+      }
+
+      .form-group {
+        margin-bottom: 12px;
+      }
+
+      .button {
+        padding: 10px 14px;
+      }
     }
 
     .login-header {

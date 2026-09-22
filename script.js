@@ -441,6 +441,63 @@ document.addEventListener('DOMContentLoaded', () => {
   setupMediaUpload();
   setupProfilePictureUpload();
   setupLogoUpload();
-  if (menuToggle && sidebar) menuToggle.addEventListener('click', () => sidebar.classList.toggle('is-open'));
-  document.addEventListener('click', (event) => { if (window.innerWidth <= 760 && sidebar && menuToggle && !sidebar.contains(event.target) && !menuToggle.contains(event.target)) sidebar.classList.remove('is-open'); });
+  
+  // Enhanced mobile sidebar functionality
+  if (menuToggle && sidebar) {
+    // Create overlay for mobile sidebar
+    const overlay = document.createElement('div');
+    overlay.className = 'sidebar-overlay';
+    overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 15; display: none; opacity: 0; transition: opacity 0.3s ease;';
+    document.body.appendChild(overlay);
+    
+    const toggleSidebar = () => {
+      const isOpen = sidebar.classList.toggle('is-open');
+      // Prevent body scroll when sidebar is open on mobile
+      if (isOpen) {
+        document.body.style.overflow = 'hidden';
+        overlay.style.display = 'block';
+        setTimeout(() => overlay.style.opacity = '1', 0);
+      } else {
+        document.body.style.overflow = '';
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 300);
+      }
+    };
+    
+    menuToggle.addEventListener('click', toggleSidebar);
+    overlay.addEventListener('click', toggleSidebar);
+    
+    // Close sidebar on window resize if switching to desktop
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 768 && sidebar.classList.contains('is-open')) {
+        sidebar.classList.remove('is-open');
+        document.body.style.overflow = '';
+        overlay.style.display = 'none';
+        overlay.style.opacity = '0';
+      }
+    });
+    
+    // Close sidebar when clicking a nav item on mobile
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        if (window.innerWidth <= 768 && sidebar.classList.contains('is-open')) {
+          toggleSidebar();
+        }
+      });
+    });
+  }
+  
+  // Handle escape key to close sidebar
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && sidebar && sidebar.classList.contains('is-open')) {
+      sidebar.classList.remove('is-open');
+      document.body.style.overflow = '';
+      const overlay = document.querySelector('.sidebar-overlay');
+      if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 300);
+      }
+    }
+  });
 });
