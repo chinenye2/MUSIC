@@ -1,19 +1,22 @@
-const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const multer = require('multer');
-const bcrypt = require('bcrypt');
-const cookieParser = require('cookie-parser');
+const express = require("express");
+const sqlite3 = require("sqlite3").verbose();
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
+const multer = require("multer");
+const bcrypt = require("bcrypt");
+const cookieParser = require("cookie-parser");
+const https = require("https");
+
+
 
 const app = express();
 const port = process.env.PORT || 5000;
-const dbPath = path.join(__dirname, 'artist-dashboard.db');
-const uploadDir = path.join(__dirname, 'uploads');
-const authCookieName = 'artist_session';
-const sessionSecret = 'force-logout-' + crypto.randomBytes(32).toString('hex');
+const dbPath = path.join(__dirname, "artist-dashboard.db");
+const uploadDir = path.join(__dirname, "uploads");
+const authCookieName = "artist_session";
+const sessionSecret = "force-logout-" + crypto.randomBytes(32).toString("hex");
 
 app.use(cookieParser(sessionSecret));
 app.use(express.json());
@@ -22,12 +25,19 @@ app.use(express.urlencoded({ extended: true }));
 fs.mkdirSync(uploadDir, { recursive: true });
 
 app.use((req, res, next) => {
-  const trackingKeys = Object.keys(req.query).filter((key) => key.toLowerCase().startsWith('utm_'));
+  const trackingKeys = Object.keys(req.query).filter((key) =>
+    key.toLowerCase().startsWith("utm_"),
+  );
   if (trackingKeys.length === 0) return next();
 
-  const cleanUrl = new URL(`${req.protocol}://${req.get('host')}${req.originalUrl}`);
+  const cleanUrl = new URL(
+    `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+  );
   trackingKeys.forEach((key) => cleanUrl.searchParams.delete(key));
-  return res.redirect(302, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+  return res.redirect(
+    302,
+    `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`,
+  );
 });
 
 const mediaUpload = multer({
@@ -40,63 +50,395 @@ const mediaUpload = multer({
   }),
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    callback(null, file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/'));
+    callback(
+      null,
+      file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/"),
+    );
   },
 });
 
 const db = new sqlite3.Database(dbPath, (error) => {
   if (error) {
-    console.error('Database connection error:', error.message);
+    console.error("Database connection error:", error.message);
   }
 });
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'home.html'));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "home.html"));
 });
 
 app.use((req, res, next) => {
-  const origin = req.headers.origin || '';
+  const origin = req.headers.origin || "";
   if (/^https?:\/\/(localhost|127\.0\.0\.1|172\.20\.10\.2):\d+$/.test(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET,POST,PUT,DELETE,OPTIONS",
+    );
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   }
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   return next();
 });
 
-app.use(express.static(path.join(__dirname)));
-app.use('/uploads', express.static(uploadDir));
-app.use('/images', express.static(path.join(__dirname, 'images')));
+// API routes must be defined before static file serving
+app.get("/api/spotify/album-art", async (req, res) => {
+  const { trackUrl } = req.query;
 
-const authenticateUser = (req, res, next) => {
-  const sessionCookie = req.cookies[authCookieName];
-  
-  if (!sessionCookie) {
-    if (req.path.startsWith('/api/')) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    return res.redirect('/login');
+  if (!trackUrl) {
+    res.status(400).json({ error: "trackUrl is required" });
+    return;
   }
 
   try {
-    const sessionData = JSON.parse(Buffer.from(sessionCookie, 'base64').toString());
+    const trackIdMatch = trackUrl.match(/track\/([a-zA-Z0-9]+)/);
+    if (!trackIdMatch) {
+      res.status(400).json({ error: "Invalid Spotify track URL" });
+      return;
+    }
+
+    const trackId = trackIdMatch[1];
+    const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(trackUrl)}`;
+
+    https
+      .get(oembedUrl, (response) => {
+        let data = "";
+
+        response.on("data", (chunk) => {
+          data += chunk;
+        });
+
+        response.on("end", () => {
+          try {
+            const oembedData = JSON.parse(data);
+            if (oembedData.thumbnail_url) {
+              const imageUrl = oembedData.thumbnail_url.replace("-64", "-640");
+              res.json({ imageUrl });
+            } else {
+              res.status(404).json({ error: "No album art found" });
+            }
+          } catch (parseError) {
+            res.status(500).json({ error: "Failed to parse Spotify response" });
+          }
+        });
+      })
+      .on("error", (error) => {
+        res.status(500).json({ error: error.message });
+      });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/apple-music/album-art", async (req, res) => {
+  const { searchTerm } = req.query;
+
+  if (!searchTerm) {
+    res.status(400).json({ error: "searchTerm is required" });
+    return;
+  }
+
+  try {
+    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&media=music&limit=1`;
+
+    https
+      .get(searchUrl, (response) => {
+        let data = "";
+
+        response.on("data", (chunk) => {
+          data += chunk;
+        });
+
+        response.on("end", () => {
+          try {
+            const searchData = JSON.parse(data);
+            if (searchData.results && searchData.results.length > 0) {
+              const artworkUrl = searchData.results[0].artworkUrl100;
+              const highResUrl = artworkUrl.replace("100x100", "600x600");
+              res.json({ imageUrl: highResUrl });
+            } else {
+              res.status(404).json({ error: "No album art found" });
+            }
+          } catch (parseError) {
+            res.status(500).json({ error: "Failed to parse iTunes response" });
+          }
+        });
+      })
+      .on("error", (error) => {
+        res.status(500).json({ error: error.message });
+      });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/youtube/thumbnail", async (req, res) => {
+  const { videoUrl } = req.query;
+
+  if (!videoUrl) {
+    res.status(400).json({ error: "videoUrl is required" });
+    return;
+  }
+
+  try {
+    const videoIdMatch = videoUrl.match(
+      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/,
+    );
+    if (!videoIdMatch) {
+      res.status(400).json({ error: "Invalid YouTube URL" });
+      return;
+    }
+
+    const videoId = videoIdMatch[1];
+    const thumbnailUrls = [
+      `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+      `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+    ];
+
+    res.json({ imageUrl: thumbnailUrls[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/apple-music/artist-image", async (req, res) => {
+  const { artistUrl } = req.query;
+
+  if (!artistUrl) {
+    res.status(400).json({ error: "artistUrl is required" });
+    return;
+  }
+
+  try {
+    const artistIdMatch = artistUrl.match(/artist\/.*\/(\d+)/);
+    if (!artistIdMatch) {
+      res.status(400).json({ error: "Invalid Apple Music artist URL" });
+      return;
+    }
+
+    const artistId = artistIdMatch[1];
+    const searchUrl = `https://itunes.apple.com/lookup?id=${artistId}`;
+
+    https
+      .get(searchUrl, (response) => {
+        let data = "";
+
+        response.on("data", (chunk) => {
+          data += chunk;
+        });
+
+        response.on("end", () => {
+          try {
+            const lookupData = JSON.parse(data);
+            if (lookupData.results && lookupData.results.length > 0) {
+              const artistData = lookupData.results[0];
+              if (artistData.artworkUrl100) {
+                const highResUrl = artistData.artworkUrl100.replace(
+                  "100x100",
+                  "600x600",
+                );
+                res.json({ imageUrl: highResUrl });
+              } else {
+                res.status(404).json({ error: "No artist image found" });
+              }
+            } else {
+              res.status(404).json({ error: "Artist not found" });
+            }
+          } catch (parseError) {
+            res.status(500).json({ error: "Failed to parse iTunes response" });
+          }
+        });
+      })
+      .on("error", (error) => {
+        res.status(500).json({ error: error.message });
+      });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/audiomack/thumbnail", async (req, res) => {
+  const { trackUrl } = req.query;
+
+  if (!trackUrl) {
+    res.status(400).json({ error: "trackUrl is required" });
+    return;
+  }
+
+  try {
+    const url = new URL(trackUrl);
+
+    if (!url.hostname.includes("audiomack.com")) {
+      res.status(400).json({ error: "Invalid Audiomack URL" });
+      return;
+    }
+
+    const response = await fetch(trackUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      res.status(502).json({
+        error: `Failed to fetch Audiomack page: ${response.status}`,
+      });
+      return;
+    }
+
+    const html = await response.text();
+
+    const imageMatch =
+      html.match(
+        /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      ) ||
+      html.match(
+        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      );
+
+    if (!imageMatch) {
+      res.status(404).json({
+        error: "Audiomack artwork not found",
+      });
+      return;
+    }
+
+    res.json({
+      imageUrl: imageMatch[1],
+    });
+  } catch (error) {
+    console.error("Audiomack thumbnail error:", error);
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+});
+
+const BOOMPLAY_APP_ID = process.env.BOOMPLAY_APP_ID || "your_app_id";
+const BOOMPLAY_SECRET_KEY = process.env.BOOMPLAY_SECRET_KEY || "your_secret_key";
+
+app.get("/api/boomplay/thumbnail", async (req, res) => {
+  const { trackUrl } = req.query;
+
+  if (typeof trackUrl !== "string" || !trackUrl) {
+    return res.status(400).json({ error: "trackUrl is required" });
+  }
+
+  try {
+    const url = new URL(trackUrl);
+
+    if (url.hostname !== "boomplay.com" && !url.hostname.endsWith(".boomplay.com")) {
+      return res.status(400).json({ error: "Invalid Boomplay URL" });
+    }
+
+    // 1. Extract the ID from the URL path
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const type = pathParts[0]; // e.g., "songs", "albums"
+    const id = pathParts[1];    // The numeric ID
+
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({ error: "Could not parse a valid ID from the provided URL" });
+    }
+
+    // 2. Prepare Boomplay API authentication signatures
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const sign = crypto
+      .createHash('md5')
+      .update(BOOMPLAY_APP_ID + timestamp + BOOMPLAY_SECRET_KEY)
+      .digest('hex');
+
+    let apiUrl = '';
+    let requestBody = {};
+
+    if (type === 'songs' || type === 'song') {
+      apiUrl = 'https://boomplay.com';
+      requestBody = { trackId: id };
+    } else {
+      apiUrl = 'https://boomplay.com';
+      requestBody = { albumId: id };
+    }
+
+    // 3. Make the API request using native fetch
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'app_id': BOOMPLAY_APP_ID,
+        'timestamp': timestamp,
+        'sign': sign,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Boomplay API responded with status ${response.status}` });
+    }
+
+    const result = await response.json();
     
+    // Check if the Boomplay API returned a business logic failure
+    if (result.code !== 0 || !result.data) {
+      return res.status(404).json({ 
+        error: result.message || "Content not found on Boomplay" 
+      });
+    }
+
+    // 4. Extract artwork URL from response
+    const resultData = result.data;
+    const imageUrl = resultData.artwork?.url || resultData.coverUrl; 
+
+    if (!imageUrl) {
+      return res.status(404).json({ error: "Boomplay artwork not found in metadata" });
+    }
+
+    return res.json({ imageUrl });
+
+  } catch (error) {
+    console.error("Boomplay API error:", error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+
+app.use(express.static(path.join(__dirname)));
+app.use("/uploads", express.static(uploadDir));
+app.use("/images", express.static(path.join(__dirname, "images")));
+
+const authenticateUser = (req, res, next) => {
+  const sessionCookie = req.cookies[authCookieName];
+
+  if (!sessionCookie) {
+    if (req.path.startsWith("/api/")) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    return res.redirect("/login");
+  }
+
+  try {
+    const sessionData = JSON.parse(
+      Buffer.from(sessionCookie, "base64").toString(),
+    );
+
     if (sessionData.expiresAt < Date.now()) {
       res.clearCookie(authCookieName);
-      if (req.path.startsWith('/api/')) {
-        return res.status(401).json({ error: 'Session expired' });
+      if (req.path.startsWith("/api/")) {
+        return res.status(401).json({ error: "Session expired" });
       }
-      return res.redirect('/login');
+      return res.redirect("/login");
     }
     req.user = sessionData;
     next();
   } catch (error) {
     res.clearCookie(authCookieName);
-    if (req.path.startsWith('/api/')) {
-      return res.status(401).json({ error: 'Invalid session' });
+    if (req.path.startsWith("/api/")) {
+      return res.status(401).json({ error: "Invalid session" });
     }
-    return res.redirect('/login');
+    return res.redirect("/login");
   }
 };
 
@@ -158,9 +500,9 @@ async function seedDatabase() {
     )
   `);
 
-  const userColumns = await all('PRAGMA table_info(users)');
-  if (!userColumns.some((column) => column.name === 'password')) {
-    await run('ALTER TABLE users ADD COLUMN password TEXT');
+  const userColumns = await all("PRAGMA table_info(users)");
+  if (!userColumns.some((column) => column.name === "password")) {
+    await run("ALTER TABLE users ADD COLUMN password TEXT");
   }
 
   await run(`
@@ -190,36 +532,106 @@ async function seedDatabase() {
     )
   `);
 
-  const artistColumns = await all('PRAGMA table_info(artists)');
-  if (!artistColumns.some((column) => column.name === 'updatedAt')) {
-    await run('ALTER TABLE artists ADD COLUMN updatedAt TEXT');
-    await run('UPDATE artists SET updatedAt = CURRENT_TIMESTAMP WHERE updatedAt IS NULL');
+  const artistColumns = await all("PRAGMA table_info(artists)");
+  if (!artistColumns.some((column) => column.name === "updatedAt")) {
+    await run("ALTER TABLE artists ADD COLUMN updatedAt TEXT");
+    await run(
+      "UPDATE artists SET updatedAt = CURRENT_TIMESTAMP WHERE updatedAt IS NULL",
+    );
   }
-  if (!artistColumns.some((column) => column.name === 'profileImageUrl')) {
-    await run('ALTER TABLE artists ADD COLUMN profileImageUrl TEXT');
+  if (!artistColumns.some((column) => column.name === "profileImageUrl")) {
+    await run("ALTER TABLE artists ADD COLUMN profileImageUrl TEXT");
   }
-  if (!artistColumns.some((column) => column.name === 'logoImageUrl')) {
-    await run('ALTER TABLE artists ADD COLUMN logoImageUrl TEXT');
+  if (!artistColumns.some((column) => column.name === "logoImageUrl")) {
+    await run("ALTER TABLE artists ADD COLUMN logoImageUrl TEXT");
   }
 
   await run(`
     CREATE TABLE IF NOT EXISTS music (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
-      platform TEXT NOT NULL,
-      status TEXT NOT NULL,
-      videoUrl TEXT,
+      artist TEXT,
+      year INTEGER,
+      imageUrl TEXT,
+      platform TEXT,
+      status TEXT,
+      spotifyUrl TEXT,
+      appleMusicUrl TEXT,
+      youtubeUrl TEXT,
+      audiomackUrl TEXT,
+      boomplayUrl TEXT,
       musicUrl TEXT,
+      videoUrl TEXT,
       createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  const musicColumns = await all('PRAGMA table_info(music)');
-  if (!musicColumns.some((column) => column.name === 'videoUrl')) {
-    await run('ALTER TABLE music ADD COLUMN videoUrl TEXT');
+  const musicColumns = await all("PRAGMA table_info(music)");
+  if (!musicColumns.some((column) => column.name === "videoUrl")) {
+    await run("ALTER TABLE music ADD COLUMN videoUrl TEXT");
   }
-  if (!musicColumns.some((column) => column.name === 'musicUrl')) {
-    await run('ALTER TABLE music ADD COLUMN musicUrl TEXT');
+  if (!musicColumns.some((column) => column.name === "coverArt")) {
+    await run("ALTER TABLE music ADD COLUMN coverArt TEXT");
+  }
+  if (!musicColumns.some((column) => column.name === "artist")) {
+    await run("ALTER TABLE music ADD COLUMN artist TEXT");
+  }
+  if (!musicColumns.some((column) => column.name === "year")) {
+    await run("ALTER TABLE music ADD COLUMN year INTEGER");
+  }
+  if (!musicColumns.some((column) => column.name === "imageUrl")) {
+    await run("ALTER TABLE music ADD COLUMN imageUrl TEXT");
+  }
+  if (!musicColumns.some((column) => column.name === "spotifyUrl")) {
+    await run("ALTER TABLE music ADD COLUMN spotifyUrl TEXT");
+  }
+  if (!musicColumns.some((column) => column.name === "appleMusicUrl")) {
+    await run("ALTER TABLE music ADD COLUMN appleMusicUrl TEXT");
+  }
+  if (!musicColumns.some((column) => column.name === "youtubeUrl")) {
+    await run("ALTER TABLE music ADD COLUMN youtubeUrl TEXT");
+  }
+  if (!musicColumns.some((column) => column.name === "audiomackUrl")) {
+    await run("ALTER TABLE music ADD COLUMN audiomackUrl TEXT");
+  }
+  if (!musicColumns.some((column) => column.name === "boomplayUrl")) {
+    await run("ALTER TABLE music ADD COLUMN boomplayUrl TEXT");
+  }
+
+  // Remove NOT NULL constraint from platform and status for existing tables
+  const platformColumn = musicColumns.find((col) => col.name === "platform");
+  if (platformColumn && platformColumn.notnull === 1) {
+    // Need to recreate table to remove NOT NULL constraint
+    await run(`
+      CREATE TABLE music_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        artist TEXT,
+        year INTEGER,
+        imageUrl TEXT,
+        platform TEXT,
+        status TEXT,
+        spotifyUrl TEXT,
+        appleMusicUrl TEXT,
+        youtubeUrl TEXT,
+        audiomackUrl TEXT,
+        boomplayUrl TEXT,
+        musicUrl TEXT,
+        videoUrl TEXT,
+        coverArt TEXT,
+        createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await run(`
+      INSERT INTO music_new (id, title, artist, year, imageUrl, platform, status, spotifyUrl, appleMusicUrl, youtubeUrl, audiomackUrl, boomplayUrl, musicUrl, videoUrl, coverArt, createdAt)
+      SELECT id, title, artist, year, imageUrl, platform, status, spotifyUrl, NULL, NULL, NULL, NULL, musicUrl, videoUrl, coverArt, createdAt
+      FROM music
+    `);
+    await run("DROP TABLE music");
+    await run("ALTER TABLE music_new RENAME TO music");
+  }
+  if (!musicColumns.some((column) => column.name === "musicUrl")) {
+    await run("ALTER TABLE music ADD COLUMN musicUrl TEXT");
   }
 
   await run(`
@@ -237,18 +649,18 @@ async function seedDatabase() {
     )
   `);
 
-  const eventColumns = await all('PRAGMA table_info(events)');
-  if (!eventColumns.some((column) => column.name === 'ticketUrl')) {
-    await run('ALTER TABLE events ADD COLUMN ticketUrl TEXT');
+  const eventColumns = await all("PRAGMA table_info(events)");
+  if (!eventColumns.some((column) => column.name === "ticketUrl")) {
+    await run("ALTER TABLE events ADD COLUMN ticketUrl TEXT");
   }
-  if (!eventColumns.some((column) => column.name === 'imageUrl')) {
-    await run('ALTER TABLE events ADD COLUMN imageUrl TEXT');
+  if (!eventColumns.some((column) => column.name === "imageUrl")) {
+    await run("ALTER TABLE events ADD COLUMN imageUrl TEXT");
   }
-  if (!eventColumns.some((column) => column.name === 'imageNotes')) {
-    await run('ALTER TABLE events ADD COLUMN imageNotes TEXT');
+  if (!eventColumns.some((column) => column.name === "imageNotes")) {
+    await run("ALTER TABLE events ADD COLUMN imageNotes TEXT");
   }
-  if (!eventColumns.some((column) => column.name === 'videoUrl')) {
-    await run('ALTER TABLE events ADD COLUMN videoUrl TEXT');
+  if (!eventColumns.some((column) => column.name === "videoUrl")) {
+    await run("ALTER TABLE events ADD COLUMN videoUrl TEXT");
   }
 
   await run(`
@@ -273,9 +685,9 @@ async function seedDatabase() {
     )
   `);
 
-  const mediaColumns = await all('PRAGMA table_info(media)');
-  if (!mediaColumns.some((column) => column.name === 'likes')) {
-    await run('ALTER TABLE media ADD COLUMN likes INTEGER NOT NULL DEFAULT 0');
+  const mediaColumns = await all("PRAGMA table_info(media)");
+  if (!mediaColumns.some((column) => column.name === "likes")) {
+    await run("ALTER TABLE media ADD COLUMN likes INTEGER NOT NULL DEFAULT 0");
   }
 
   await run(`
@@ -288,62 +700,123 @@ async function seedDatabase() {
     )
   `);
 
-  const pressColumns = await all('PRAGMA table_info(press)');
-  if (!pressColumns.some((column) => column.name === 'videoUrl')) {
-    await run('ALTER TABLE press ADD COLUMN videoUrl TEXT');
+  const pressColumns = await all("PRAGMA table_info(press)");
+  if (!pressColumns.some((column) => column.name === "videoUrl")) {
+    await run("ALTER TABLE press ADD COLUMN videoUrl TEXT");
   }
 
-  const pressRows = await all('SELECT * FROM press');
+  const pressRows = await all("SELECT * FROM press");
   if (pressRows.length === 0) {
-    await run('INSERT INTO press (source, detail) VALUES (?, ?)', ['Indie Pulse', 'Featured artist interview']);
-    await run('INSERT INTO press (source, detail) VALUES (?, ?)', ['Neon Beat', 'Live review and spotlight']);
-    await run('INSERT INTO press (source, detail) VALUES (?, ?)', ['Editorial playlist', '11 adds across Spotify']);
-    await run('INSERT INTO press (source, detail) VALUES (?, ?)', ['1.2M+ streams', 'Across catalog and singles']);
+    await run("INSERT INTO press (source, detail) VALUES (?, ?)", [
+      "Indie Pulse",
+      "Featured artist interview",
+    ]);
+    await run("INSERT INTO press (source, detail) VALUES (?, ?)", [
+      "Neon Beat",
+      "Live review and spotlight",
+    ]);
+    await run("INSERT INTO press (source, detail) VALUES (?, ?)", [
+      "Editorial playlist",
+      "11 adds across Spotify",
+    ]);
+    await run("INSERT INTO press (source, detail) VALUES (?, ?)", [
+      "1.2M+ streams",
+      "Across catalog and singles",
+    ]);
   }
 
   await run(
     `INSERT OR IGNORE INTO artists (id, name, stageName, genre, location, bioStatus, profileCompletion)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['aster-vale', 'Aster Vale', 'Aster Vale', 'Alt-pop / Electronic', 'Los Angeles, CA', 'Approved', 88]
+    [
+      "aster-vale",
+      "Aster Vale",
+      "Aster Vale",
+      "Alt-pop / Electronic",
+      "Los Angeles, CA",
+      "Approved",
+      88,
+    ],
   );
 
-  const musicRows = await all('SELECT * FROM music');
+  const musicRows = await all("SELECT * FROM music");
   if (musicRows.length === 0) {
-    await run(`INSERT INTO music (title, platform, status) VALUES (?, ?, ?)`, ['Run the Lights', 'Spotify', 'Live']);
-    await run(`INSERT INTO music (title, platform, status) VALUES (?, ?, ?)`, ['Midnight Signal', 'Apple Music', 'Queued']);
-    await run(`INSERT INTO music (title, platform, status) VALUES (?, ?, ?)`, ['Afterglow', 'YouTube', 'Live']);
+    await run(`INSERT INTO music (title, platform, status) VALUES (?, ?, ?)`, [
+      "Run the Lights",
+      "Spotify",
+      "Live",
+    ]);
+    await run(`INSERT INTO music (title, platform, status) VALUES (?, ?, ?)`, [
+      "Midnight Signal",
+      "Apple Music",
+      "Queued",
+    ]);
+    await run(`INSERT INTO music (title, platform, status) VALUES (?, ?, ?)`, [
+      "Afterglow",
+      "YouTube",
+      "Live",
+    ]);
   }
 
-  const eventRows = await all('SELECT * FROM events');
+  const eventRows = await all("SELECT * FROM events");
   if (eventRows.length === 0) {
-    await run(`INSERT INTO events (title, date, city, type) VALUES (?, ?, ?, ?)`, ['Sunset Room', '2026-09-28', 'Los Angeles, CA', 'Headline']);
-    await run(`INSERT INTO events (title, date, city, type) VALUES (?, ?, ?, ?)`, ['Velvet Hall', '2026-10-11', 'Chicago, IL', 'Featured']);
-    await run(`INSERT INTO events (title, date, city, type) VALUES (?, ?, ?, ?)`, ['Glassline Fest', '2026-11-02', 'Brooklyn, NY', 'Festival']);
+    await run(
+      `INSERT INTO events (title, date, city, type) VALUES (?, ?, ?, ?)`,
+      ["Sunset Room", "2026-09-28", "Los Angeles, CA", "Headline"],
+    );
+    await run(
+      `INSERT INTO events (title, date, city, type) VALUES (?, ?, ?, ?)`,
+      ["Velvet Hall", "2026-10-11", "Chicago, IL", "Featured"],
+    );
+    await run(
+      `INSERT INTO events (title, date, city, type) VALUES (?, ?, ?, ?)`,
+      ["Glassline Fest", "2026-11-02", "Brooklyn, NY", "Festival"],
+    );
   }
 
-  const messageRows = await all('SELECT * FROM messages');
+  const messageRows = await all("SELECT * FROM messages");
   if (messageRows.length === 0) {
-    await run(`INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)`, ['North Star Agency', 'Interested in a winter showcase in Seattle.', 1, '2h ago']);
-    await run(`INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)`, ['Moonlight Club', 'Booking request for October headline slot.', 0, '1d ago']);
-    await run(`INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)`, ['Press House', 'Feature request for an artist spotlight.', 0, '3d ago']);
+    await run(
+      `INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)`,
+      [
+        "North Star Agency",
+        "Interested in a winter showcase in Seattle.",
+        1,
+        "2h ago",
+      ],
+    );
+    await run(
+      `INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)`,
+      [
+        "Moonlight Club",
+        "Booking request for October headline slot.",
+        0,
+        "1d ago",
+      ],
+    );
+    await run(
+      `INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)`,
+      ["Press House", "Feature request for an artist spotlight.", 0, "3d ago"],
+    );
   }
 }
 
 async function getArtistProfile() {
-  const artist = await get(
-    'SELECT * FROM artists WHERE id = ?',
-    ['aster-vale']
-  );
+  const artist = await get("SELECT * FROM artists WHERE id = ?", [
+    "aster-vale",
+  ]);
 
   if (!artist) {
-    throw new Error('Artist not found');
+    throw new Error("Artist not found");
   }
 
-  const tracks = await all('SELECT * FROM music ORDER BY createdAt DESC');
-  const events = await all('SELECT * FROM events ORDER BY date ASC');
-  const bookingMessages = await all('SELECT * FROM messages ORDER BY createdAt DESC');
+  const tracks = await all("SELECT * FROM music ORDER BY createdAt DESC");
+  const events = await all("SELECT * FROM events ORDER BY date ASC");
+  const bookingMessages = await all(
+    "SELECT * FROM messages ORDER BY createdAt DESC",
+  );
 
-  const press = await all('SELECT * FROM press ORDER BY createdAt DESC');
+  const press = await all("SELECT * FROM press ORDER BY createdAt DESC");
 
   return {
     id: artist.id,
@@ -362,32 +835,37 @@ async function getArtistProfile() {
     press,
     stats: {
       profileCompletion: artist.profileCompletion,
-      tracksLive: tracks.filter((track) => track.status === 'Live').length,
+      tracksLive: tracks.filter((track) => track.status === "Live").length,
       upcomingEvents: events.length,
-      bookingRequests: bookingMessages.length
-    }
+      bookingRequests: bookingMessages.length,
+    },
   };
 }
 
-function parseCookies(cookieHeader = '') {
-  return cookieHeader.split(';').reduce((acc, cookiePair) => {
-    const [key, ...rest] = cookiePair.trim().split('=');
+function parseCookies(cookieHeader = "") {
+  return cookieHeader.split(";").reduce((acc, cookiePair) => {
+    const [key, ...rest] = cookiePair.trim().split("=");
     if (key && rest.length) {
-      acc[key] = decodeURIComponent(rest.join('='));
+      acc[key] = decodeURIComponent(rest.join("="));
     }
     return acc;
   }, {});
 }
 
 async function findOrCreateUser(email) {
-  const existingUser = await get('SELECT * FROM users WHERE email = ?', [email]);
+  const existingUser = await get("SELECT * FROM users WHERE email = ?", [
+    email,
+  ]);
 
   if (existingUser) {
     return existingUser;
   }
 
-  const result = await run('INSERT INTO users (email, name) VALUES (?, ?)', [email, email.split('@')[0]]);
-  return { id: result.id, email, name: email.split('@')[0] };
+  const result = await run("INSERT INTO users (email, name) VALUES (?, ?)", [
+    email,
+    email.split("@")[0],
+  ]);
+  return { id: result.id, email, name: email.split("@")[0] };
 }
 
 async function sendMagicLinkEmail(email, token) {
@@ -404,18 +882,21 @@ async function sendMagicLinkEmail(email, token) {
   const transporter = nodemailer.createTransport({
     host: smtpHost,
     port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: smtpUser && smtpPass ? {
-      user: smtpUser,
-      pass: smtpPass,
-    } : undefined,
+    secure: process.env.SMTP_SECURE === "true",
+    auth:
+      smtpUser && smtpPass
+        ? {
+            user: smtpUser,
+            pass: smtpPass,
+          }
+        : undefined,
   });
 
   const loginUrl = `http://localhost:${port}/login?token=${token}`;
   const info = await transporter.sendMail({
-    from: process.env.SMTP_FROM || 'noreply@astervale.com',
+    from: process.env.SMTP_FROM || "noreply@astervale.com",
     to: email,
-    subject: 'Your Aster Vale dashboard login link',
+    subject: "Your Aster Vale dashboard login link",
     text: `Use this link to sign in: ${loginUrl}`,
     html: `<p>Use this link to sign in:</p><p><a href="${loginUrl}">${loginUrl}</a></p>`,
   });
@@ -427,64 +908,76 @@ async function sendMagicLinkEmail(email, token) {
 
 async function verifyToken(token) {
   const record = await get(
-    'SELECT * FROM auth_tokens WHERE token = ? AND usedAt IS NULL',
-    [token]
+    "SELECT * FROM auth_tokens WHERE token = ? AND usedAt IS NULL",
+    [token],
   );
 
   if (!record) {
-    throw new Error('Invalid or expired login token');
+    throw new Error("Invalid or expired login token");
   }
 
   if (new Date(record.expiresAt).getTime() < Date.now()) {
-    throw new Error('Login token expired');
+    throw new Error("Login token expired");
   }
 
-  const user = await get('SELECT * FROM users WHERE id = ?', [record.userId]);
+  const user = await get("SELECT * FROM users WHERE id = ?", [record.userId]);
   if (!user) {
-    throw new Error('User not found');
+    throw new Error("User not found");
   }
 
-  await run('UPDATE auth_tokens SET usedAt = ? WHERE id = ?', [new Date().toISOString(), record.id]);
+  await run("UPDATE auth_tokens SET usedAt = ? WHERE id = ?", [
+    new Date().toISOString(),
+    record.id,
+  ]);
   return user;
 }
 
-app.get('/api/auth/me', async (req, res) => {
-  const cookies = parseCookies(req.headers.cookie || '');
+app.get("/api/auth/me", async (req, res) => {
+  const cookies = parseCookies(req.headers.cookie || "");
   const userId = Number(cookies[authCookieName]);
 
   if (!userId) {
-    return res.status(401).json({ error: 'Not authenticated' });
+    return res.status(401).json({ error: "Not authenticated" });
   }
 
-  const user = await get('SELECT * FROM users WHERE id = ?', [userId]);
+  const user = await get("SELECT * FROM users WHERE id = ?", [userId]);
   if (!user) {
-    return res.status(401).json({ error: 'Invalid session' });
+    return res.status(401).json({ error: "Invalid session" });
   }
 
-  return res.json({ id: user.id, email: user.email, name: user.name || user.email.split('@')[0] });
+  return res.json({
+    id: user.id,
+    email: user.email,
+    name: user.name || user.email.split("@")[0],
+  });
 });
 
-app.post('/api/auth/request-login', async (req, res) => {
+app.post("/api/auth/request-login", async (req, res) => {
   const { email } = req.body || {};
-  const cleanedEmail = String(email || '').trim().toLowerCase();
+  const cleanedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
 
-  if (!cleanedEmail || !cleanedEmail.includes('@')) {
-    return res.status(400).json({ error: 'A valid email is required' });
+  if (!cleanedEmail || !cleanedEmail.includes("@")) {
+    return res.status(400).json({ error: "A valid email is required" });
   }
 
   try {
     const user = await findOrCreateUser(cleanedEmail);
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-    await run('DELETE FROM auth_tokens WHERE userId = ?', [user.id]);
-    await run('INSERT INTO auth_tokens (userId, token, expiresAt) VALUES (?, ?, ?)', [user.id, token, expiresAt]);
+    await run("DELETE FROM auth_tokens WHERE userId = ?", [user.id]);
+    await run(
+      "INSERT INTO auth_tokens (userId, token, expiresAt) VALUES (?, ?, ?)",
+      [user.id, token, expiresAt],
+    );
 
     const emailResult = await sendMagicLinkEmail(cleanedEmail, token);
     return res.json({
       success: true,
       email: cleanedEmail,
-      message: 'Check your email for the magic link.',
+      message: "Check your email for the magic link.",
       previewUrl: emailResult.preview || null,
       link: `http://localhost:${port}/login?token=${token}`,
     });
@@ -493,135 +986,145 @@ app.post('/api/auth/request-login', async (req, res) => {
   }
 });
 
-app.get('/api/auth/verify', async (req, res) => {
-  const token = String(req.query.token || '').trim();
+app.get("/api/auth/verify", async (req, res) => {
+  const token = String(req.query.token || "").trim();
 
   if (!token) {
-    return res.status(400).json({ error: 'Missing login token' });
+    return res.status(400).json({ error: "Missing login token" });
   }
 
   try {
     const user = await verifyToken(token);
     res.cookie(authCookieName, String(user.id), {
       httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
+      sameSite: "lax",
+      path: "/",
       maxAge: 1000 * 60 * 60 * 12,
     });
 
-    return res.redirect('/');
+    return res.redirect("/");
   } catch (error) {
     return res.status(401).json({ error: error.message });
   }
 });
 
-app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie(authCookieName, { path: '/' });
+app.post("/api/auth/logout", (req, res) => {
+  res.clearCookie(authCookieName, { path: "/" });
   return res.json({ success: true });
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body || {};
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+    return res.status(400).json({ error: "Email and password are required" });
   }
 
   try {
-    const user = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+    const user = await get("SELECT * FROM users WHERE email = ?", [
+      email.toLowerCase(),
+    ]);
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const sessionData = {
       userId: user.id,
       email: user.email,
       name: user.name,
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
     };
 
-    const sessionCookie = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    const sessionCookie = Buffer.from(JSON.stringify(sessionData)).toString(
+      "base64",
+    );
     res.cookie(authCookieName, sessionCookie, {
       httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
+      sameSite: "lax",
+      path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return res.json({ 
-      success: true, 
-      user: { id: user.id, email: user.email, name: user.name } 
+    return res.json({
+      success: true,
+      user: { id: user.id, email: user.email, name: user.name },
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   const { email, password, name } = req.body || {};
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+    return res.status(400).json({ error: "Email and password are required" });
   }
 
   if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 6 characters" });
   }
 
   try {
-    const existingUser = await get('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+    const existingUser = await get("SELECT * FROM users WHERE email = ?", [
+      email.toLowerCase(),
+    ]);
     if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: "User already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await run(
-      'INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
-      [email.toLowerCase(), hashedPassword, name || email.split('@')[0]]
+      "INSERT INTO users (email, password, name) VALUES (?, ?, ?)",
+      [email.toLowerCase(), hashedPassword, name || email.split("@")[0]],
     );
 
-    const newUser = await get('SELECT * FROM users WHERE id = ?', [result.id]);
-    
+    const newUser = await get("SELECT * FROM users WHERE id = ?", [result.id]);
+
     const sessionData = {
       userId: newUser.id,
       email: newUser.email,
       name: newUser.name,
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
     };
 
-    const sessionCookie = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    const sessionCookie = Buffer.from(JSON.stringify(sessionData)).toString(
+      "base64",
+    );
     res.cookie(authCookieName, sessionCookie, {
       httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
+      sameSite: "lax",
+      path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return res.status(201).json({ 
-      success: true, 
-      user: { id: newUser.id, email: newUser.email, name: newUser.name } 
+    return res.status(201).json({
+      success: true,
+      user: { id: newUser.id, email: newUser.email, name: newUser.name },
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/login', (req, res) => {
-  res.clearCookie(authCookieName, { path: '/' });
-  res.sendFile(path.join(__dirname, 'login.html'));
+app.get("/login", (req, res) => {
+  res.clearCookie(authCookieName, { path: "/" });
+  res.sendFile(path.join(__dirname, "login.html"));
 });
 
-app.get('/force-logout', (req, res) => {
-  res.clearCookie(authCookieName, { path: '/' });
+app.get("/force-logout", (req, res) => {
+  res.clearCookie(authCookieName, { path: "/" });
   res.send('Session cleared. <a href="/dashboard">Try dashboard now</a>');
 });
 
-app.get('/api/artist', authenticateUser, async (req, res) => {
+app.get("/api/artist", authenticateUser, async (req, res) => {
   try {
     const artist = await getArtistProfile();
     res.json(artist);
@@ -630,8 +1133,17 @@ app.get('/api/artist', authenticateUser, async (req, res) => {
   }
 });
 
-app.put('/api/artist', authenticateUser, async (req, res) => {
-  const { name, stageName, genre, location, bioStatus, profileCompletion, profileImageUrl, logoImageUrl } = req.body || {};
+app.put("/api/artist", authenticateUser, async (req, res) => {
+  const {
+    name,
+    stageName,
+    genre,
+    location,
+    bioStatus,
+    profileCompletion,
+    profileImageUrl,
+    logoImageUrl,
+  } = req.body || {};
 
   try {
     await run(
@@ -646,7 +1158,17 @@ app.put('/api/artist', authenticateUser, async (req, res) => {
            logoImageUrl = COALESCE(?, logoImageUrl),
            updatedAt = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [name, stageName, genre, location, bioStatus, profileCompletion, profileImageUrl, logoImageUrl, 'aster-vale']
+      [
+        name,
+        stageName,
+        genre,
+        location,
+        bioStatus,
+        profileCompletion,
+        profileImageUrl,
+        logoImageUrl,
+        "aster-vale",
+      ],
     );
 
     res.json(await getArtistProfile());
@@ -655,7 +1177,7 @@ app.put('/api/artist', authenticateUser, async (req, res) => {
   }
 });
 
-app.put('/api/artist/profile-image', authenticateUser, async (req, res) => {
+app.put("/api/artist/profile-image", authenticateUser, async (req, res) => {
   const { profileImageUrl } = req.body || {};
 
   try {
@@ -664,7 +1186,7 @@ app.put('/api/artist/profile-image', authenticateUser, async (req, res) => {
        SET profileImageUrl = COALESCE(?, profileImageUrl),
            updatedAt = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [profileImageUrl, 'aster-vale']
+      [profileImageUrl, "aster-vale"],
     );
 
     res.json(await getArtistProfile());
@@ -673,7 +1195,7 @@ app.put('/api/artist/profile-image', authenticateUser, async (req, res) => {
   }
 });
 
-app.put('/api/artist/logo-image', authenticateUser, async (req, res) => {
+app.put("/api/artist/logo-image", authenticateUser, async (req, res) => {
   const { logoImageUrl } = req.body || {};
 
   try {
@@ -682,7 +1204,7 @@ app.put('/api/artist/logo-image', authenticateUser, async (req, res) => {
        SET logoImageUrl = COALESCE(?, logoImageUrl),
            updatedAt = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [logoImageUrl, 'aster-vale']
+      [logoImageUrl, "aster-vale"],
     );
 
     res.json(await getArtistProfile());
@@ -691,99 +1213,177 @@ app.put('/api/artist/logo-image', authenticateUser, async (req, res) => {
   }
 });
 
-app.get('/api/music', authenticateUser, async (req, res) => {
+app.get("/api/music", async (req, res) => {
   try {
-    const tracks = await all('SELECT * FROM music ORDER BY createdAt DESC');
+    const tracks = await all("SELECT * FROM music ORDER BY createdAt DESC");
     res.json(tracks);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/music', authenticateUser, async (req, res) => {
-  const { title, platform, status, videoUrl, musicUrl } = req.body || {};
+app.post("/api/music", authenticateUser, async (req, res) => {
+  const {
+    title,
+    artist,
+    year,
+    imageUrl,
+    platform,
+    status,
+    spotifyUrl,
+    appleMusicUrl,
+    youtubeUrl,
+    audiomackUrl,
+    boomplayUrl,
+    musicUrl,
+    videoUrl,
+  } = req.body || {};
 
-  if (!title || !platform || !status) {
-    res.status(400).json({ error: 'title, platform, and status are required' });
+  if (!title) {
+    res.status(400).json({ error: "title is required" });
     return;
   }
 
   try {
     const result = await run(
-      'INSERT INTO music (title, platform, status, videoUrl, musicUrl) VALUES (?, ?, ?, ?, ?)',
-      [title, platform, status, videoUrl || null, musicUrl || null]
+      "INSERT INTO music (title, artist, year, imageUrl, platform, status, spotifyUrl, appleMusicUrl, youtubeUrl, audiomackUrl, boomplayUrl, musicUrl, videoUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        title,
+        artist || null,
+        year || null,
+        imageUrl || null,
+        platform || null,
+        status || "Draft",
+        spotifyUrl || null,
+        appleMusicUrl || null,
+        youtubeUrl || null,
+        audiomackUrl || null,
+        boomplayUrl || null,
+        musicUrl || null,
+        videoUrl || null,
+      ],
     );
 
-    const song = await get('SELECT * FROM music WHERE id = ?', [result.id]);
+    const song = await get("SELECT * FROM music WHERE id = ?", [result.id]);
     res.status(201).json(song);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/music/:id', authenticateUser, async (req, res) => {
-  const { title, platform, status, videoUrl, musicUrl } = req.body || {};
+app.put("/api/music/:id", authenticateUser, async (req, res) => {
+  const {
+    title,
+    artist,
+    year,
+    imageUrl,
+    platform,
+    status,
+    spotifyUrl,
+    appleMusicUrl,
+    youtubeUrl,
+    audiomackUrl,
+    boomplayUrl,
+    musicUrl,
+    videoUrl,
+  } = req.body || {};
 
   try {
     await run(
       `UPDATE music
        SET title = COALESCE(?, title),
+           artist = COALESCE(?, artist),
+           year = COALESCE(?, year),
+           imageUrl = COALESCE(?, imageUrl),
            platform = COALESCE(?, platform),
            status = COALESCE(?, status),
-           videoUrl = COALESCE(?, videoUrl),
-           musicUrl = COALESCE(?, musicUrl)
+           spotifyUrl = COALESCE(?, spotifyUrl),
+           appleMusicUrl = COALESCE(?, appleMusicUrl),
+           youtubeUrl = COALESCE(?, youtubeUrl),
+           audiomackUrl = COALESCE(?, audiomackUrl),
+           boomplayUrl = COALESCE(?, boomplayUrl),
+           musicUrl = COALESCE(?, musicUrl),
+           videoUrl = COALESCE(?, videoUrl)
        WHERE id = ?`,
-      [title, platform, status, videoUrl, musicUrl, Number(req.params.id)]
+      [
+        title,
+        artist,
+        year,
+        imageUrl,
+        platform,
+        status,
+        spotifyUrl,
+        appleMusicUrl,
+        youtubeUrl,
+        audiomackUrl,
+        boomplayUrl,
+        musicUrl,
+        videoUrl,
+        Number(req.params.id),
+      ],
     );
 
-    const row = await get('SELECT * FROM music WHERE id = ?', [Number(req.params.id)]);
+    const row = await get("SELECT * FROM music WHERE id = ?", [
+      Number(req.params.id),
+    ]);
     res.json(row);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete('/api/music/:id', authenticateUser, async (req, res) => {
+app.delete("/api/music/:id", authenticateUser, async (req, res) => {
   try {
-    await run('DELETE FROM music WHERE id = ?', [Number(req.params.id)]);
+    await run("DELETE FROM music WHERE id = ?", [Number(req.params.id)]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/events', authenticateUser, async (req, res) => {
+app.get("/api/events", authenticateUser, async (req, res) => {
   try {
-    const list = await all('SELECT * FROM events ORDER BY date ASC');
+    const list = await all("SELECT * FROM events ORDER BY date ASC");
     res.json(list);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/events', authenticateUser, async (req, res) => {
-  const { title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl } = req.body || {};
+app.post("/api/events", authenticateUser, async (req, res) => {
+  const { title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl } =
+    req.body || {};
 
   if (!title || !date || !city || !type) {
-    res.status(400).json({ error: 'title, date, city, and type are required' });
+    res.status(400).json({ error: "title, date, city, and type are required" });
     return;
   }
 
   try {
     const result = await run(
-      'INSERT INTO events (title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [title, date, city, type, ticketUrl || null, imageUrl || null, imageNotes || null, videoUrl || null]
+      "INSERT INTO events (title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [
+        title,
+        date,
+        city,
+        type,
+        ticketUrl || null,
+        imageUrl || null,
+        imageNotes || null,
+        videoUrl || null,
+      ],
     );
 
-    const event = await get('SELECT * FROM events WHERE id = ?', [result.id]);
+    const event = await get("SELECT * FROM events WHERE id = ?", [result.id]);
     res.status(201).json(event);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/events/:id', authenticateUser, async (req, res) => {
-  const { title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl } = req.body || {};
+app.put("/api/events/:id", authenticateUser, async (req, res) => {
+  const { title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl } =
+    req.body || {};
 
   try {
     await run(
@@ -797,12 +1397,24 @@ app.put('/api/events/:id', authenticateUser, async (req, res) => {
            imageNotes = COALESCE(?, imageNotes),
            videoUrl = COALESCE(?, videoUrl)
        WHERE id = ?`,
-      [title, date, city, type, ticketUrl, imageUrl, imageNotes, videoUrl, Number(req.params.id)]
+      [
+        title,
+        date,
+        city,
+        type,
+        ticketUrl,
+        imageUrl,
+        imageNotes,
+        videoUrl,
+        Number(req.params.id),
+      ],
     );
 
-    const event = await get('SELECT * FROM events WHERE id = ?', [Number(req.params.id)]);
+    const event = await get("SELECT * FROM events WHERE id = ?", [
+      Number(req.params.id),
+    ]);
     if (!event) {
-      return res.status(404).json({ error: 'Event not found' });
+      return res.status(404).json({ error: "Event not found" });
     }
     return res.json(event);
   } catch (error) {
@@ -810,46 +1422,46 @@ app.put('/api/events/:id', authenticateUser, async (req, res) => {
   }
 });
 
-app.delete('/api/events/:id', authenticateUser, async (req, res) => {
+app.delete("/api/events/:id", authenticateUser, async (req, res) => {
   try {
-    await run('DELETE FROM events WHERE id = ?', [Number(req.params.id)]);
+    await run("DELETE FROM events WHERE id = ?", [Number(req.params.id)]);
     return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/messages', async (req, res) => {
+app.get("/api/messages", async (req, res) => {
   try {
-    const list = await all('SELECT * FROM messages ORDER BY createdAt DESC');
+    const list = await all("SELECT * FROM messages ORDER BY createdAt DESC");
     res.json(list);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/messages', async (req, res) => {
+app.post("/api/messages", async (req, res) => {
   const { sender, message, unread = true } = req.body || {};
 
   if (!sender || !message) {
-    res.status(400).json({ error: 'sender and message are required' });
+    res.status(400).json({ error: "sender and message are required" });
     return;
   }
 
   try {
     const result = await run(
-      'INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)',
-      [sender, message, unread ? 1 : 0, new Date().toLocaleString()]
+      "INSERT INTO messages (sender, message, unread, time) VALUES (?, ?, ?, ?)",
+      [sender, message, unread ? 1 : 0, new Date().toLocaleString()],
     );
 
-    const item = await get('SELECT * FROM messages WHERE id = ?', [result.id]);
+    const item = await get("SELECT * FROM messages WHERE id = ?", [result.id]);
     res.status(201).json(item);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/messages/:id', authenticateUser, async (req, res) => {
+app.put("/api/messages/:id", authenticateUser, async (req, res) => {
   const { sender, message, unread } = req.body || {};
 
   try {
@@ -859,12 +1471,19 @@ app.put('/api/messages/:id', authenticateUser, async (req, res) => {
            message = COALESCE(?, message),
            unread = COALESCE(?, unread)
        WHERE id = ?`,
-      [sender, message, typeof unread === 'boolean' ? (unread ? 1 : 0) : unread, Number(req.params.id)]
+      [
+        sender,
+        message,
+        typeof unread === "boolean" ? (unread ? 1 : 0) : unread,
+        Number(req.params.id),
+      ],
     );
 
-    const item = await get('SELECT * FROM messages WHERE id = ?', [Number(req.params.id)]);
+    const item = await get("SELECT * FROM messages WHERE id = ?", [
+      Number(req.params.id),
+    ]);
     if (!item) {
-      return res.status(404).json({ error: 'Message not found' });
+      return res.status(404).json({ error: "Message not found" });
     }
     return res.json(item);
   } catch (error) {
@@ -872,50 +1491,65 @@ app.put('/api/messages/:id', authenticateUser, async (req, res) => {
   }
 });
 
-app.put('/api/messages/:id/read', authenticateUser, async (req, res) => {
+app.put("/api/messages/:id/read", authenticateUser, async (req, res) => {
   try {
-    await run('UPDATE messages SET unread = 0 WHERE id = ?', [Number(req.params.id)]);
-    const item = await get('SELECT * FROM messages WHERE id = ?', [Number(req.params.id)]);
+    await run("UPDATE messages SET unread = 0 WHERE id = ?", [
+      Number(req.params.id),
+    ]);
+    const item = await get("SELECT * FROM messages WHERE id = ?", [
+      Number(req.params.id),
+    ]);
     res.json(item);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/media', async (req, res) => {
+app.get("/api/media", async (req, res) => {
   try {
-    const media = await all('SELECT * FROM media ORDER BY createdAt DESC');
-    res.json(media.map((item) => ({ ...item, url: `/uploads/${item.filename}` })));
+    const media = await all("SELECT * FROM media ORDER BY createdAt DESC");
+    res.json(
+      media.map((item) => ({ ...item, url: `/uploads/${item.filename}` })),
+    );
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/media', authenticateUser, mediaUpload.single('media'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Choose an image or video file' });
-  }
-
-  try {
-    const result = await run(
-      'INSERT INTO media (filename, originalName, mimeType) VALUES (?, ?, ?)',
-      [req.file.filename, req.file.originalname, req.file.mimetype]
-    );
-    const item = await get('SELECT * FROM media WHERE id = ?', [result.id]);
-    return res.status(201).json({ ...item, url: `/uploads/${item.filename}` });
-  } catch (error) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete('/api/media/:id', authenticateUser, async (req, res) => {
-  try {
-    const item = await get('SELECT * FROM media WHERE id = ?', [Number(req.params.id)]);
-    if (!item) {
-      return res.status(404).json({ error: 'Media not found' });
+app.post(
+  "/api/media",
+  authenticateUser,
+  mediaUpload.single("media"),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Choose an image or video file" });
     }
-    await run('DELETE FROM media WHERE id = ?', [Number(req.params.id)]);
+
+    try {
+      const result = await run(
+        "INSERT INTO media (filename, originalName, mimeType) VALUES (?, ?, ?)",
+        [req.file.filename, req.file.originalname, req.file.mimetype],
+      );
+      const item = await get("SELECT * FROM media WHERE id = ?", [result.id]);
+      return res
+        .status(201)
+        .json({ ...item, url: `/uploads/${item.filename}` });
+    } catch (error) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+app.delete("/api/media/:id", authenticateUser, async (req, res) => {
+  try {
+    const item = await get("SELECT * FROM media WHERE id = ?", [
+      Number(req.params.id),
+    ]);
+    if (!item) {
+      return res.status(404).json({ error: "Media not found" });
+    }
+    await run("DELETE FROM media WHERE id = ?", [Number(req.params.id)]);
     fs.unlink(path.join(uploadDir, item.filename), () => {});
     return res.json({ success: true });
   } catch (error) {
@@ -923,12 +1557,16 @@ app.delete('/api/media/:id', authenticateUser, async (req, res) => {
   }
 });
 
-app.post('/api/media/:id/like', authenticateUser, async (req, res) => {
+app.post("/api/media/:id/like", authenticateUser, async (req, res) => {
   try {
-    await run('UPDATE media SET likes = likes + 1 WHERE id = ?', [Number(req.params.id)]);
-    const item = await get('SELECT * FROM media WHERE id = ?', [Number(req.params.id)]);
+    await run("UPDATE media SET likes = likes + 1 WHERE id = ?", [
+      Number(req.params.id),
+    ]);
+    const item = await get("SELECT * FROM media WHERE id = ?", [
+      Number(req.params.id),
+    ]);
     if (!item) {
-      return res.status(404).json({ error: 'Media not found' });
+      return res.status(404).json({ error: "Media not found" });
     }
     return res.json(item);
   } catch (error) {
@@ -946,23 +1584,28 @@ const eventImageUpload = multer({
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    callback(null, file.mimetype.startsWith('image/'));
+    callback(null, file.mimetype.startsWith("image/"));
   },
 });
 
-app.post('/api/event-image', authenticateUser, eventImageUpload.single('image'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Choose an image file' });
-  }
+app.post(
+  "/api/event-image",
+  authenticateUser,
+  eventImageUpload.single("image"),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Choose an image file" });
+    }
 
-  try {
-    const imageUrl = `/uploads/${req.file.filename}`;
-    return res.status(201).json({ imageUrl });
-  } catch (error) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ error: error.message });
-  }
-});
+    try {
+      const imageUrl = `/uploads/${req.file.filename}`;
+      return res.status(201).json({ imageUrl });
+    } catch (error) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 const profileImageUpload = multer({
   storage: multer.diskStorage({
@@ -974,23 +1617,28 @@ const profileImageUpload = multer({
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    callback(null, file.mimetype.startsWith('image/'));
+    callback(null, file.mimetype.startsWith("image/"));
   },
 });
 
-app.post('/api/profile-image', authenticateUser, profileImageUpload.single('image'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Choose an image file' });
-  }
+app.post(
+  "/api/profile-image",
+  authenticateUser,
+  profileImageUpload.single("image"),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Choose an image file" });
+    }
 
-  try {
-    const imageUrl = `/uploads/${req.file.filename}`;
-    return res.status(201).json({ imageUrl });
-  } catch (error) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ error: error.message });
-  }
-});
+    try {
+      const imageUrl = `/uploads/${req.file.filename}`;
+      return res.status(201).json({ imageUrl });
+    } catch (error) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 const logoImageUpload = multer({
   storage: multer.diskStorage({
@@ -1002,23 +1650,28 @@ const logoImageUpload = multer({
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    callback(null, file.mimetype.startsWith('image/'));
+    callback(null, file.mimetype.startsWith("image/"));
   },
 });
 
-app.post('/api/logo-image', authenticateUser, logoImageUpload.single('image'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Choose an image file' });
-  }
+app.post(
+  "/api/logo-image",
+  authenticateUser,
+  logoImageUpload.single("image"),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Choose an image file" });
+    }
 
-  try {
-    const imageUrl = `/uploads/${req.file.filename}`;
-    return res.status(201).json({ imageUrl });
-  } catch (error) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ error: error.message });
-  }
-});
+    try {
+      const imageUrl = `/uploads/${req.file.filename}`;
+      return res.status(201).json({ imageUrl });
+    } catch (error) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 const eventVideoUpload = multer({
   storage: multer.diskStorage({
@@ -1030,23 +1683,28 @@ const eventVideoUpload = multer({
   }),
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    callback(null, file.mimetype.startsWith('video/'));
+    callback(null, file.mimetype.startsWith("video/"));
   },
 });
 
-app.post('/api/event-video', authenticateUser, eventVideoUpload.single('video'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Choose a video file' });
-  }
+app.post(
+  "/api/event-video",
+  authenticateUser,
+  eventVideoUpload.single("video"),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Choose a video file" });
+    }
 
-  try {
-    const videoUrl = `/uploads/${req.file.filename}`;
-    return res.status(201).json({ videoUrl });
-  } catch (error) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ error: error.message });
-  }
-});
+    try {
+      const videoUrl = `/uploads/${req.file.filename}`;
+      return res.status(201).json({ videoUrl });
+    } catch (error) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 const pressVideoUpload = multer({
   storage: multer.diskStorage({
@@ -1058,73 +1716,129 @@ const pressVideoUpload = multer({
   }),
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    callback(null, file.mimetype.startsWith('video/'));
+    callback(null, file.mimetype.startsWith("video/"));
   },
 });
 
-app.post('/api/press-video', authenticateUser, pressVideoUpload.single('video'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Choose a video file' });
-  }
+app.post(
+  "/api/press-video",
+  authenticateUser,
+  pressVideoUpload.single("video"),
+  async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Choose a video file" });
+    }
 
-  try {
-    const videoUrl = `/uploads/${req.file.filename}`;
-    return res.status(201).json({ videoUrl });
-  } catch (error) {
-    fs.unlink(req.file.path, () => {});
-    return res.status(500).json({ error: error.message });
-  }
-});
+    try {
+      const videoUrl = `/uploads/${req.file.filename}`;
+      return res.status(201).json({ videoUrl });
+    } catch (error) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
 
-app.post('/api/press', authenticateUser, async (req, res) => {
+app.post("/api/press", authenticateUser, async (req, res) => {
   const { source, detail, videoUrl } = req.body || {};
   if (!source || !detail) {
-    return res.status(400).json({ error: 'source and detail are required' });
+    return res.status(400).json({ error: "source and detail are required" });
   }
 
   try {
-    const result = await run('INSERT INTO press (source, detail, videoUrl) VALUES (?, ?, ?)', [source, detail, videoUrl || null]);
-    const item = await get('SELECT * FROM press WHERE id = ?', [result.id]);
+    const result = await run(
+      "INSERT INTO press (source, detail, videoUrl) VALUES (?, ?, ?)",
+      [source, detail, videoUrl || null],
+    );
+    const item = await get("SELECT * FROM press WHERE id = ?", [result.id]);
     return res.status(201).json(item);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.delete('/api/press/:id', authenticateUser, async (req, res) => {
+app.delete("/api/press/:id", authenticateUser, async (req, res) => {
   try {
-    await run('DELETE FROM press WHERE id = ?', [Number(req.params.id)]);
+    await run("DELETE FROM press WHERE id = ?", [Number(req.params.id)]);
     return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.put("/api/press/:id", authenticateUser, async (req, res) => {
+  const { source, detail, videoUrl } = req.body || {};
+  if (!source || !detail) {
+    return res.status(400).json({ error: "source and detail are required" });
+  }
+
+  try {
+    await run(
+      "UPDATE press SET source = ?, detail = ?, videoUrl = ? WHERE id = ?",
+      [source, detail, videoUrl || null, Number(req.params.id)],
+    );
+    const item = await get("SELECT * FROM press WHERE id = ?", [Number(req.params.id)]);
+    return res.json(item);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/dashboard', authenticateUser, (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+// Public API endpoint for press data (no authentication required)
+app.get("/api/press", async (req, res) => {
+  try {
+    const press = await all("SELECT * FROM press ORDER BY createdAt DESC");
+    return res.json(press);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/contact', (req, res) => {
-  res.sendFile(path.join(__dirname, 'contact.html'));
+// Public API endpoint for events data (no authentication required)
+app.get("/api/events", async (req, res) => {
+  try {
+    const events = await all("SELECT * FROM events ORDER BY date ASC");
+    return res.json(events);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'home.html'));
+// Temporary endpoint to update all tracks to Live status
+app.put("/api/music/update-status", authenticateUser, async (req, res) => {
+  try {
+    await run("UPDATE music SET status = 'Live' WHERE status IS NULL OR status = 'Draft'");
+    return res.json({ success: true, message: "All tracks updated to Live status" });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+app.get("/dashboard", authenticateUser, (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+app.get("/contact", (req, res) => {
+  res.sendFile(path.join(__dirname, "contact.html"));
+});
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "home.html"));
 });
 
 if (require.main === module) {
-  dbReady.then(() => {
-    app.listen(port, '0.0.0.0', () => {
-      console.log(`Artist dashboard API running on http://localhost:${port}`);
+  dbReady.then(async () => {
+      app.listen(port, "0.0.0.0", () => {
+        console.log(`Artist dashboard API running on http://localhost:${port}`);
+      });
+    }).catch((error) => {
+      console.error("Failed to start app:", error);
+      process.exit(1);
     });
-  }).catch((error) => {
-    console.error('Failed to start app:', error);
-    process.exit(1);
-  });
 }
 
 module.exports = { app, db };

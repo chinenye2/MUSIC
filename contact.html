@@ -152,6 +152,11 @@
             <button type="submit">Send message</button>
             <p id="contactStatus" class="status" aria-live="polite"></p>
           </form>
+          <div id="successMessage" style="display: none; text-align: center; padding: 20px;">
+            <h3 style="margin: 0 0 12px; color: var(--ink);">Message sent successfully!</h3>
+            <p style="margin: 0 0 20px; color: var(--muted);">Thank you for reaching out. We'll get back to you soon.</p>
+            <a href="/" style="display: inline-block; padding: 0.85rem 1.2rem; background: var(--ink); color: var(--paper); text-decoration: none; border-radius: 999px; font-weight: 700;">Return to home</a>
+          </div>
         </section>
       </main>
     </div>
@@ -168,8 +173,11 @@
           const text = await response.text();
           const data = text ? JSON.parse(text) : {};
           if (!response.ok) throw new Error(data.error || `Unable to send message (${response.status}) from ${response.url}.`);
-          form.reset();
-          status.textContent = 'Message sent successfully.';
+          
+          // Hide form and show success message
+          form.style.display = 'none';
+          status.style.display = 'none';
+          document.getElementById('successMessage').style.display = 'block';
         } catch (error) { status.textContent = error.message; }
       });
     </script>
